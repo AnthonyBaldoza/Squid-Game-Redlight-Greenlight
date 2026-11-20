@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ARENA } from "./environment.js";
+import { Sound } from "./audio.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -131,6 +132,10 @@ export class Player {
     this.down = false;
     this.inputMag = 0;
     this.disp = 0;
+    this.y = 0;
+    this.vy = 0;
+    this.grounded = true;
+    this.jumpBuf = 0;
     this.group.position.copy(this.pos);
     this.group.rotation.set(0, 0, 0);
   }
@@ -145,6 +150,7 @@ export class Player {
   bind(canvas, t) {
     addEventListener("keydown", (e) => {
       if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
+      if (e.code === "Space" && !e.repeat) this.jumpBuf = 0.15;
       this.keys.add(e.code);
     });
     addEventListener("keyup", (e) => this.keys.delete(e.code));
@@ -241,6 +247,12 @@ export class Player {
     });
     t.sprint.addEventListener("pointerup", () => sp(false));
     t.sprint.addEventListener("pointercancel", () => sp(false));
+
+    // Jump button
+    t.jump.addEventListener("pointerdown", (e) => {
+      t.jump.setPointerCapture(e.pointerId);
+      this.jumpBuf = 0.15;
+    });
   }
 
   // locked = true -> input ignored and the player brakes hard (Red Light / countdown / end screens)
@@ -293,6 +305,25 @@ export class Player {
     this.disp =
       Math.hypot(this.pos.x - px, this.pos.z - pz) / Math.max(dt, 1e-4);
 
+    // Jump: only on Green Light (ignored while locked). Vertical motion never counts as movement on Red.
+    if (locked || this.finished || this.down) this.jumpBuf = 0;
+    else this.jumpBuf -= dt;
+    if (this.jumpBuf > 0 && this.grounded) {
+      this.vy = 7.2;
+      this.grounded = false;
+      this.jumpBuf = 0;
+      Sound.jump();
+    }
+    if (!this.grounded) {
+      this.vy -= 22 * dt;
+      this.y += this.vy * dt;
+      if (this.y <= 0) {
+        this.y = 0;
+        this.vy = 0;
+        this.grounded = true;
+      }
+    }
+
     // Visuals
     const sp = Math.hypot(this.vel.x, this.vel.z);
     if (sp > 0.4) {
@@ -313,8 +344,11 @@ export class Player {
       this.fallA = Math.min(Math.PI / 2, this.fallA + dt * 3);
     this.group.position.set(
       this.pos.x,
-      Math.sin(this.fallA) * 0.3 +
-        Math.abs(Math.sin(this.phase)) * 0.06 * Math.min(sp / 5, 1),
+      this.y +
+        Math.sin(this.fallA) * 0.3 +
+        (this.grounded
+          ? Math.abs(Math.sin(this.phase)) * 0.06 * Math.min(sp / 5, 1)
+          : 0),
       this.pos.z,
     );
     this.group.rotation.set(-this.fallA, this.heading, 0);
@@ -401,7 +435,7 @@ export class CameraRig {
       this.des.y += Math.sin(p.phase * 2) * 0.05 * p.speedFrac();
       this.lt.set(
         p.pos.x - Math.sin(p.yaw) * 3,
-        1.9,
+        1.9 + p.y * 0.6,
         p.pos.z - Math.cos(p.yaw) * 3,
       );
       k = 1 - Math.exp(-dt * 9);

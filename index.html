@@ -60,6 +60,7 @@
       </div>
       <button id="muteBtn" class="icon" aria-label="Mute">🔊</button>
       <button id="quitBtn" class="icon" aria-label="Quit to menu">✕</button>
+      <button id="pauseBtn" class="icon" aria-label="Pause">⏸</button>
       <div class="hud-bottom">
         <div id="hint"></div>
         <div id="sprintInd">SPRINT</div>
@@ -73,6 +74,7 @@
     <div id="touch" class="hidden">
       <div id="stick"><div id="knob"></div></div>
       <button id="sprintBtn">SPRINT</button>
+      <button id="jumpBtn">JUMP</button>
     </div>
 
     <!-- Main menu -->
@@ -93,6 +95,7 @@
         <button class="btn alt" id="btnSettings">SETTINGS</button>
       </div>
       <div class="best" id="menuBest"></div>
+      <div class="credit">DEVELOPED BY ANTHONY F. BALDOZA</div>
     </div>
 
     <!-- How to play -->
@@ -116,9 +119,10 @@
         </ul>
         <h3 id="howKeys">Controls</h3>
         <p class="keys">
-          Desktop: WASD / Arrow keys to move, Shift to sprint, mouse to look
-          (click the game to capture the mouse).<br />Mobile: left joystick to
-          move, hold SPRINT to run, drag the right side to look around.
+          Desktop: WASD / Arrow keys to move, Shift to sprint, Space to jump,
+          mouse to look (click the game to capture the mouse).<br />Mobile: left
+          joystick to move, hold SPRINT to run, tap JUMP to jump, drag the right
+          side to look around.
         </p>
         <button class="btn" id="howBack">BACK</button>
       </div>
@@ -147,6 +151,17 @@
         <p class="note" id="recNote"></p>
         <button class="btn" id="setBack">DONE</button>
       </div>
+    </div>
+
+    <!-- Paused -->
+    <div id="pause" class="screen hidden">
+      <h2 class="big">PAUSED</h2>
+      <div class="menu-btns">
+        <button class="btn" id="pauseResume">RESUME</button>
+        <button class="btn alt" id="pauseRestart">RESTART</button>
+        <button class="btn alt" id="pauseMenu">MAIN MENU</button>
+      </div>
+      <p class="note pnote">Press P or Esc to pause / resume</p>
     </div>
 
     <!-- Eliminated / game over -->

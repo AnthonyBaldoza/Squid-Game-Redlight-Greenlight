@@ -1,95 +1,173 @@
-import { Sound } from './audio.js';
-import { settings, isTouch, getBest, RECOMMENDED, PRESETS } from './settings.js';
+import { Sound } from "./audio.js";
+import {
+  settings,
+  isTouch,
+  getBest,
+  RECOMMENDED,
+  PRESETS,
+} from "./settings.js";
 
-const $ = id => document.getElementById(id);
-const SCREENS = ['menu', 'how', 'settings', 'over', 'win'];
-const fmt = t => (t == null ? '--' : t.toFixed(2) + 's');
-let last = {}, cdTimer = 0, noteTimer = 0;
+const $ = (id) => document.getElementById(id);
+const SCREENS = ["menu", "how", "settings", "pause", "over", "win"];
+const fmt = (t) => (t == null ? "--" : t.toFixed(2) + "s");
+let last = {},
+  cdTimer = 0,
+  noteTimer = 0;
 
 export const UI = {
   init(h) {
     // First interaction unlocks audio; every button gets a click sound.
-    document.addEventListener('pointerdown', e => {
-      Sound.init();
-      if (e.target.closest && e.target.closest('.btn,.seg button,.icon')) Sound.click();
-    }, true);
+    document.addEventListener(
+      "pointerdown",
+      (e) => {
+        Sound.init();
+        if (e.target.closest && e.target.closest(".btn,.seg button,.icon"))
+          Sound.click();
+      },
+      true,
+    );
 
-    $('btnPlay').onclick = h.play;
-    $('btnHow').onclick = () => UI.show('how');
-    $('btnSettings').onclick = () => UI.show('settings');
-    $('howBack').onclick = () => UI.show('menu');
-    $('setBack').onclick = () => UI.show('menu');
-    document.querySelectorAll('[data-p]').forEach(b => { b.onclick = () => h.preset(b.dataset.p); });
-    $('vol').oninput = e => h.volume(e.target.value / 100);
-    $('muteSet').onclick = h.mute;
-    $('muteBtn').onclick = h.mute;
-    $('quitBtn').onclick = h.menu;
-    $('overRestart').onclick = h.play;
-    $('overMenu').onclick = h.menu;
-    $('winRestart').onclick = h.play;
-    $('winMenu').onclick = h.menu;
+    $("btnPlay").onclick = h.play;
+    $("btnHow").onclick = () => UI.show("how");
+    $("btnSettings").onclick = () => UI.show("settings");
+    $("howBack").onclick = () => UI.show("menu");
+    $("setBack").onclick = () => UI.show("menu");
+    document.querySelectorAll("[data-p]").forEach((b) => {
+      b.onclick = () => h.preset(b.dataset.p);
+    });
+    $("vol").oninput = (e) => h.volume(e.target.value / 100);
+    $("muteSet").onclick = h.mute;
+    $("muteBtn").onclick = h.mute;
+    $("quitBtn").onclick = h.menu;
+    $("pauseBtn").onclick = h.pause;
+    $("pauseResume").onclick = h.resume;
+    $("pauseRestart").onclick = h.play;
+    $("pauseMenu").onclick = h.menu;
+    $("overRestart").onclick = h.play;
+    $("overMenu").onclick = h.menu;
+    $("winRestart").onclick = h.play;
+    $("winMenu").onclick = h.menu;
 
-    $('hint').textContent = isTouch ? 'Joystick: move · Hold SPRINT: run · Drag right side: look' : 'WASD / Arrows: move · Shift: sprint · Mouse: look';
-    $('vol').value = Math.round(settings.volume * 100);
-    $('recNote').textContent = 'Recommended for this device: ' + PRESETS[RECOMMENDED].label;
-    UI.syncPreset(settings.preset); UI.syncAudio(); UI.menuBest();
+    $("hint").textContent = isTouch
+      ? "Joystick: move · Hold SPRINT: run · JUMP · Drag right side: look"
+      : "WASD / Arrows: move · Shift: sprint · Space: jump · Mouse: look · P: pause";
+    $("vol").value = Math.round(settings.volume * 100);
+    $("recNote").textContent =
+      "Recommended for this device: " + PRESETS[RECOMMENDED].label;
+    UI.syncPreset(settings.preset);
+    UI.syncAudio();
+    UI.menuBest();
   },
 
   show(id) {
-    SCREENS.forEach(s => $(s).classList.toggle('hidden', s !== id));
+    SCREENS.forEach((s) => $(s).classList.toggle("hidden", s !== id));
     if (id && document.exitPointerLock) document.exitPointerLock();
-    if (id === 'menu') UI.menuBest();
+    if (id === "menu") UI.menuBest();
   },
   hud(on) {
-    $('hud').classList.toggle('hidden', !on);
-    $('edge').className = '';
-    if (isTouch) $('touch').classList.toggle('hidden', !on);
+    $("hud").classList.toggle("hidden", !on);
+    $("edge").className = "";
+    if (isTouch) $("touch").classList.toggle("hidden", !on);
     if (on) last = {};
-    if (!on) { $('cd').classList.add('hidden'); $('notice').classList.add('hidden'); }
+    if (!on) {
+      $("cd").classList.add("hidden");
+      $("notice").classList.add("hidden");
+    }
   },
-  menuBest() { const b = getBest(); $('menuBest').textContent = b == null ? '' : 'BEST TIME  ' + fmt(b); },
+  menuBest() {
+    const b = getBest();
+    $("menuBest").textContent = b == null ? "" : "BEST TIME  " + fmt(b);
+  },
 
-  syncPreset(name) { document.querySelectorAll('[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === name)); },
+  syncPreset(name) {
+    document
+      .querySelectorAll("[data-p]")
+      .forEach((b) => b.classList.toggle("on", b.dataset.p === name));
+  },
   syncAudio() {
-    $('muteSet').textContent = settings.muted ? 'OFF' : 'ON';
-    $('muteBtn').textContent = settings.muted ? '🔇' : '🔊';
+    $("muteSet").textContent = settings.muted ? "OFF" : "ON";
+    $("muteBtn").textContent = settings.muted ? "🔇" : "🔊";
   },
 
   setLight(kind) {
-    const el = $('light');
+    const el = $("light");
     el.className = kind;
-    el.textContent = kind === 'green' ? 'GREEN LIGHT' : kind === 'red' ? 'RED LIGHT' : 'GET READY';
-    void el.offsetWidth; el.classList.add('pop');
-    $('edge').className = 'edge-' + kind;
+    el.textContent =
+      kind === "green"
+        ? "GREEN LIGHT"
+        : kind === "red"
+          ? "RED LIGHT"
+          : "GET READY";
+    void el.offsetWidth;
+    el.classList.add("pop");
+    $("edge").className = "edge-" + kind;
   },
   updateHud(time, remain, pct, meters) {
     const ts = Math.ceil(time);
-    if (last.ts !== ts) { last.ts = ts; $('timer').textContent = ts; $('timer').classList.toggle('low', ts <= 10); }
-    if (last.r !== remain) { last.r = remain; $('remain').textContent = remain; }
-    if (last.p !== pct) { last.p = pct; $('pct').textContent = pct + '%'; $('barfill').style.width = pct + '%'; $('meters').textContent = meters + ' / 100 m'; }
+    if (last.ts !== ts) {
+      last.ts = ts;
+      $("timer").textContent = ts;
+      $("timer").classList.toggle("low", ts <= 10);
+    }
+    if (last.r !== remain) {
+      last.r = remain;
+      $("remain").textContent = remain;
+    }
+    if (last.p !== pct) {
+      last.p = pct;
+      $("pct").textContent = pct + "%";
+      $("barfill").style.width = pct + "%";
+      $("meters").textContent = meters + " / 100 m";
+    }
   },
-  sprint(on) { if (last.s !== on) { last.s = on; $('sprintInd').classList.toggle('on', on); } },
+  sprint(on) {
+    if (last.s !== on) {
+      last.s = on;
+      $("sprintInd").classList.toggle("on", on);
+    }
+  },
 
   countdown(txt) {
-    const el = $('cd');
+    const el = $("cd");
     clearTimeout(cdTimer);
-    el.textContent = txt; el.classList.remove('hidden');
-    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-    cdTimer = setTimeout(() => el.classList.add('hidden'), txt === 'GO!' ? 800 : 950);
+    el.textContent = txt;
+    el.classList.remove("hidden");
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    cdTimer = setTimeout(
+      () => el.classList.add("hidden"),
+      txt === "GO!" ? 800 : 950,
+    );
   },
   notify(txt, good) {
-    const el = $('notice');
+    const el = $("notice");
     clearTimeout(noteTimer);
-    el.textContent = txt; el.classList.toggle('good', !!good); el.classList.remove('hidden');
-    el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
-    noteTimer = setTimeout(() => el.classList.add('hidden'), 1800);
+    el.textContent = txt;
+    el.classList.toggle("good", !!good);
+    el.classList.remove("hidden");
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+    noteTimer = setTimeout(() => el.classList.add("hidden"), 1800);
   },
-  flash() { const f = $('flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); },
+  flash() {
+    const f = $("flash");
+    f.classList.remove("on");
+    void f.offsetWidth;
+    f.classList.add("on");
+  },
 
-  showOver(reason) { $('overReason').textContent = reason; UI.hud(false); UI.show('over'); },
+  showOver(reason) {
+    $("overReason").textContent = reason;
+    UI.hud(false);
+    UI.show("over");
+  },
   showVictory(time, best, isNew) {
-    $('winTime').textContent = fmt(time); $('winBest').textContent = fmt(best);
-    $('winNew').classList.toggle('hidden', !isNew);
-    UI.hud(false); UI.show('win');
-  }
+    $("winTime").textContent = fmt(time);
+    $("winBest").textContent = fmt(best);
+    $("winNew").classList.toggle("hidden", !isNew);
+    UI.hud(false);
+    UI.show("win");
+  },
 };

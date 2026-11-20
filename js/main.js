@@ -39,6 +39,7 @@ const player = new Player(scene, canvas, {
   stick: $("stick"),
   knob: $("knob"),
   sprint: $("sprintBtn"),
+  jump: $("jumpBtn"),
 });
 const contestants = new Contestants(scene, (c) => {
   Sound.eliminate(Math.abs(c.z - player.pos.z) > 25);
@@ -131,6 +132,17 @@ function toggleMute() {
 }
 UI.init({
   play: startGame,
+  pause: () => game.pause(),
+  resume: () => {
+    game.resume();
+    if (!isTouch && canvas.requestPointerLock) {
+      try {
+        canvas.requestPointerLock();
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  },
   menu: () => game.toMenu(),
   preset: applyPreset,
   volume: (v) => {
@@ -145,6 +157,17 @@ Sound.setMuted(settings.muted);
 applyPreset(settings.preset);
 game.toMenu();
 
+// Pause: P or Esc, auto-pause when the mouse lock is released or the tab is hidden
+addEventListener("keydown", (e) => {
+  if (e.repeat || (e.code !== "KeyP" && e.code !== "Escape")) return;
+  if (game.paused) $("pauseResume").click();
+  else game.pause();
+});
+document.addEventListener("pointerlockchange", () => {
+  if (!document.pointerLockElement) game.pause();
+});
+addEventListener("blur", () => game.pause());
+
 // ---- Main loop (requestAnimationFrame, paused while the tab is hidden) ----
 let t = 0,
   last = 0,
@@ -156,13 +179,14 @@ function frame(now) {
   last = now;
   if (dt <= 0) return;
   if (dt > 0.05) dt = 0.05;
-  t += dt;
-
-  game.update(dt, t);
-  doll.update(dt, t);
-  particles.update(dt);
-  rig.update(dt);
-  env.update(dt, t, player.pos.x, player.pos.z);
+  if (!game.paused) {
+    t += dt;
+    game.update(dt, t);
+    doll.update(dt, t);
+    particles.update(dt);
+    rig.update(dt);
+    env.update(dt, t, player.pos.x, player.pos.z);
+  }
   renderer.render(scene, camera);
   adapt(dt);
 
@@ -174,12 +198,13 @@ function frame(now) {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    game.pause();
     cancelAnimationFrame(raf);
     Sound.suspend();
   } else {
     last = performance.now();
     raf = requestAnimationFrame(frame);
-    Sound.resume();
+    if (!game.paused) Sound.resume();
   }
 });
 last = performance.now();

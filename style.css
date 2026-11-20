@@ -57,18 +57,10 @@ button {
   );
 }
 #edge.edge-green {
-  background: radial-gradient(
-    ellipse at center,
-    transparent 55%,
-    rgba(34, 212, 106, 0.4) 100%
-  );
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(34, 212, 106, 0.4) 100%);
 }
 #edge.edge-red {
-  background: radial-gradient(
-    ellipse at center,
-    transparent 50%,
-    rgba(255, 43, 58, 0.55) 100%
-  );
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(255, 43, 58, 0.55) 100%);
 }
 #flash {
   background: #ff1030;
@@ -141,6 +133,22 @@ button {
 #how,
 #settings {
   background: rgba(5, 5, 15, 0.88);
+}
+#pause {
+  background: rgba(5, 5, 15, 0.78);
+}
+.pnote {
+  text-align: center;
+}
+.credit {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  opacity: 0.75;
 }
 .over {
   background: radial-gradient(
@@ -510,6 +518,9 @@ input[type="range"] {
 #quitBtn {
   left: calc(env(safe-area-inset-left, 0px) + 58px);
 }
+#pauseBtn {
+  left: calc(env(safe-area-inset-left, 0px) + 104px);
+}
 .hud-bottom {
   position: absolute;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
@@ -639,6 +650,27 @@ input[type="range"] {
   letter-spacing: 0.08em;
   pointer-events: auto;
   touch-action: none;
+}
+#jumpBtn {
+  position: absolute;
+  right: calc(env(safe-area-inset-right, 0px) + 6vmin + min(22vmin, 124px) + 14px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12vmin);
+  width: 18vmin;
+  height: 18vmin;
+  max-width: 100px;
+  max-height: 100px;
+  border-radius: 50%;
+  background: rgba(34, 212, 106, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  font-family: var(--font);
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  pointer-events: auto;
+  touch-action: none;
+}
+#jumpBtn:active {
+  background: var(--green);
+  box-shadow: 0 0 24px rgba(34, 212, 106, 0.9);
 }
 #sprintBtn.on {
   background: var(--pink);
