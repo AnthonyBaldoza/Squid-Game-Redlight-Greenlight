@@ -2,7 +2,7 @@
   --pink: #ed1b76;
   --green: #22d46a;
   --red: #ff2b3a;
-  --panel: rgba(10, 10, 18, 0.62);
+  --panel: rgba(10, 10, 18, 0.78);
   --font: "Bebas Neue", "Impact", "Arial Narrow", sans-serif;
   --ui: "Rajdhani", "Segoe UI", system-ui, sans-serif;
 }
@@ -41,7 +41,6 @@ button {
   width: 100%;
   height: 100%;
   display: block;
-  filter: contrast(1.07) saturate(1.15);
 }
 #vignette,
 #edge,
@@ -57,14 +56,19 @@ button {
     rgba(0, 0, 24, 0.5) 100%
   );
 }
-#edge {
-  transition: box-shadow 0.25s;
-}
 #edge.edge-green {
-  box-shadow: inset 0 0 140px rgba(34, 212, 106, 0.38);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(34, 212, 106, 0.4) 100%
+  );
 }
 #edge.edge-red {
-  box-shadow: inset 0 0 160px rgba(255, 43, 58, 0.6);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(255, 43, 58, 0.55) 100%
+  );
 }
 #flash {
   background: #ff1030;
@@ -136,9 +140,7 @@ button {
 }
 #how,
 #settings {
-  background: rgba(5, 5, 15, 0.72);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: rgba(5, 5, 15, 0.88);
 }
 .over {
   background: radial-gradient(
@@ -297,8 +299,6 @@ button {
   flex-direction: column;
   gap: 14px;
   align-items: center;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 .card h2 {
   font-family: var(--font);
@@ -408,8 +408,6 @@ input[type="range"] {
 }
 .panel {
   background: var(--panel);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 10px;
   padding: 8px 14px;
