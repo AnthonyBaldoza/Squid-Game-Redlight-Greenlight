@@ -7,7 +7,13 @@ import { Particles } from "./particles.js";
 import { Game } from "./game.js";
 import { UI } from "./ui.js";
 import { Sound } from "./audio.js";
-import { settings, saveSettings, PRESETS, isTouch } from "./settings.js";
+import {
+  settings,
+  saveSettings,
+  PRESETS,
+  isTouch,
+  touchy,
+} from "./settings.js";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("c");
@@ -113,9 +119,27 @@ function adapt(dt) {
 }
 
 // ---- UI wiring ----
+function goFullscreen() {
+  try {
+    const el = document.documentElement;
+    if (document.fullscreenElement || !el.requestFullscreen) return;
+    el.requestFullscreen()
+      .then(() => {
+        if (screen.orientation && screen.orientation.lock)
+          screen.orientation.lock("landscape").catch(() => {});
+      })
+      .catch(() => {});
+  } catch (e) {
+    /* ignore */
+  }
+}
+function checkPortrait() {
+  if (touchy() && innerWidth <= 820 && innerHeight > innerWidth) game.pause();
+}
 function startGame() {
   Sound.init();
-  if (!isTouch && canvas.requestPointerLock) {
+  if (touchy()) goFullscreen();
+  else if (canvas.requestPointerLock) {
     try {
       canvas.requestPointerLock();
     } catch (e) {
@@ -123,6 +147,8 @@ function startGame() {
     }
   }
   game.start();
+  player.releaseTouch();
+  checkPortrait();
 }
 function toggleMute() {
   settings.muted = !settings.muted;
@@ -135,7 +161,7 @@ UI.init({
   pause: () => game.pause(),
   resume: () => {
     game.resume();
-    if (!isTouch && canvas.requestPointerLock) {
+    if (!touchy() && canvas.requestPointerLock) {
       try {
         canvas.requestPointerLock();
       } catch (e) {
@@ -164,9 +190,24 @@ addEventListener("keydown", (e) => {
   else game.pause();
 });
 document.addEventListener("pointerlockchange", () => {
-  if (!document.pointerLockElement) game.pause();
+  if (!touchy() && !document.pointerLockElement) game.pause();
 });
-addEventListener("blur", () => game.pause());
+addEventListener("blur", () => {
+  if (!touchy()) game.pause();
+});
+addEventListener("resize", checkPortrait);
+addEventListener("orientationchange", () => setTimeout(checkPortrait, 250));
+
+// Touch: stop the browser from hijacking gestures (scroll / zoom / long-press menu) while playing
+document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener(
+  "touchmove",
+  (e) => {
+    if (document.body.classList.contains("playing")) e.preventDefault();
+  },
+  { passive: false },
+);
 
 // ---- Main loop (requestAnimationFrame, paused while the tab is hidden) ----
 let t = 0,

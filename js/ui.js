@@ -1,11 +1,5 @@
 import { Sound } from "./audio.js";
-import {
-  settings,
-  isTouch,
-  getBest,
-  RECOMMENDED,
-  PRESETS,
-} from "./settings.js";
+import { settings, touchy, getBest, RECOMMENDED, PRESETS } from "./settings.js";
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["menu", "how", "settings", "pause", "over", "win"];
@@ -20,6 +14,8 @@ export const UI = {
     document.addEventListener(
       "pointerdown",
       (e) => {
+        if (e.pointerType === "touch")
+          document.documentElement.classList.add("has-touch");
         Sound.init();
         if (e.target.closest && e.target.closest(".btn,.seg button,.icon"))
           Sound.click();
@@ -48,15 +44,19 @@ export const UI = {
     $("winRestart").onclick = h.play;
     $("winMenu").onclick = h.menu;
 
-    $("hint").textContent = isTouch
-      ? "Joystick: move · Hold SPRINT: run · JUMP · Drag right side: look"
-      : "WASD / Arrows: move · Shift: sprint · Space: jump · Mouse: look · P: pause";
+    UI.syncHint();
     $("vol").value = Math.round(settings.volume * 100);
     $("recNote").textContent =
       "Recommended for this device: " + PRESETS[RECOMMENDED].label;
     UI.syncPreset(settings.preset);
     UI.syncAudio();
     UI.menuBest();
+  },
+
+  syncHint() {
+    $("hint").textContent = touchy()
+      ? "Left side: move (push far to sprint) · JUMP · Drag right side: look"
+      : "WASD / Arrows: move · Shift: sprint · Space: jump · Mouse: look · P: pause";
   },
 
   show(id) {
@@ -67,7 +67,9 @@ export const UI = {
   hud(on) {
     $("hud").classList.toggle("hidden", !on);
     $("edge").className = "";
-    if (isTouch) $("touch").classList.toggle("hidden", !on);
+    document.body.classList.toggle("playing", on);
+    if (on) UI.syncHint();
+    $("touch").classList.toggle("hidden", !(on && touchy()));
     if (on) last = {};
     if (!on) {
       $("cd").classList.add("hidden");

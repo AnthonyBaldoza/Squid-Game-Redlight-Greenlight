@@ -156,60 +156,31 @@ export class Player {
     addEventListener("keyup", (e) => this.keys.delete(e.code));
     addEventListener("blur", () => this.keys.clear());
 
-    // Camera look: mouse (pointer lock or drag) and touch drag on the right side
+    // Pointer input.
+    // Mouse: pointer lock / drag to look. Touch: left side = floating joystick (appears where the thumb lands),
+    // right side = drag to look. Sprint/Jump buttons sit on top.
     let dragId = null,
       lx = 0,
-      ly = 0;
+      ly = 0,
+      stickId = null,
+      ox = 0,
+      oy = 0;
     const look = (dx, dy, sx, sy) => {
       this.yaw -= dx * sx;
       this.pitch = clamp(this.pitch + dy * sy, 0.08, 0.85);
     };
-    canvas.addEventListener("pointerdown", (e) => {
-      if (!this.active) return;
-      if (
-        e.pointerType === "mouse" &&
-        !document.pointerLockElement &&
-        canvas.requestPointerLock
-      ) {
-        try {
-          canvas.requestPointerLock();
-        } catch (err) {
-          /* ignore */
-        }
+    const rad = () => t.stick.getBoundingClientRect().width / 2 || 60;
+    const cap = (e) => {
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch (err) {
+        /* ignore */
       }
-      if (e.pointerType === "touch" && e.clientX < innerWidth * 0.4) return;
-      dragId = e.pointerId;
-      lx = e.clientX;
-      ly = e.clientY;
-    });
-    canvas.addEventListener("pointermove", (e) => {
-      if (document.pointerLockElement === canvas) {
-        look(e.movementX, e.movementY, 0.0025, 0.0025);
-        return;
-      }
-      if (e.pointerId !== dragId) return;
-      look(
-        e.clientX - lx,
-        e.clientY - ly,
-        e.pointerType === "touch" ? 0.005 : 0.004,
-        e.pointerType === "touch" ? 0.004 : 0.004,
-      );
-      lx = e.clientX;
-      ly = e.clientY;
-    });
-    const end = (e) => {
-      if (e.pointerId === dragId) dragId = null;
     };
-    canvas.addEventListener("pointerup", end);
-    canvas.addEventListener("pointercancel", end);
-
-    // Virtual joystick
-    let stickId = null;
     const setStick = (e) => {
-      const r = t.stick.getBoundingClientRect(),
-        rad = r.width / 2;
-      let dx = (e.clientX - (r.left + rad)) / rad,
-        dy = (e.clientY - (r.top + rad)) / rad;
+      const r = rad();
+      let dx = (e.clientX - ox) / r,
+        dy = (e.clientY - oy) / r;
       const m = Math.hypot(dx, dy);
       if (m > 1) {
         dx /= m;
@@ -217,24 +188,75 @@ export class Player {
       }
       this.joy.x = dx;
       this.joy.y = -dy;
-      t.knob.style.transform = `translate(${dx * rad * 0.55}px,${dy * rad * 0.55}px)`;
+      t.knob.style.transform = `translate(${dx * r * 0.55}px,${dy * r * 0.55}px)`;
     };
-    t.stick.addEventListener("pointerdown", (e) => {
-      stickId = e.pointerId;
-      t.stick.setPointerCapture(e.pointerId);
-      setStick(e);
-    });
-    t.stick.addEventListener("pointermove", (e) => {
-      if (e.pointerId === stickId) setStick(e);
-    });
-    const stickEnd = (e) => {
-      if (e.pointerId !== stickId) return;
+    const stickEnd = () => {
       stickId = null;
       this.joy.x = this.joy.y = 0;
       t.knob.style.transform = "";
+      t.stick.style.left = t.stick.style.top = t.stick.style.bottom = "";
     };
-    t.stick.addEventListener("pointerup", stickEnd);
-    t.stick.addEventListener("pointercancel", stickEnd);
+    this.releaseTouch = () => {
+      if (stickId !== null) stickEnd();
+      dragId = null;
+      this.sprintTouch = false;
+    };
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (!this.active) return;
+      if (e.pointerType === "mouse") {
+        if (!document.pointerLockElement && canvas.requestPointerLock) {
+          try {
+            canvas.requestPointerLock();
+          } catch (err) {
+            /* ignore */
+          }
+        }
+      } else if (e.clientX < innerWidth * 0.45) {
+        if (stickId !== null) return;
+        stickId = e.pointerId;
+        ox = e.clientX;
+        oy = e.clientY;
+        cap(e);
+        const r = rad();
+        t.stick.style.left = ox - r + "px";
+        t.stick.style.top = oy - r + "px";
+        t.stick.style.bottom = "auto";
+        setStick(e);
+        return;
+      }
+      if (dragId !== null) return;
+      dragId = e.pointerId;
+      lx = e.clientX;
+      ly = e.clientY;
+      cap(e);
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (document.pointerLockElement === canvas) {
+        look(e.movementX, e.movementY, 0.0025, 0.0025);
+        return;
+      }
+      if (e.pointerId === stickId) {
+        setStick(e);
+        return;
+      }
+      if (e.pointerId !== dragId) return;
+      look(
+        e.clientX - lx,
+        e.clientY - ly,
+        e.pointerType === "mouse" ? 0.004 : 0.006,
+        0.004,
+      );
+      lx = e.clientX;
+      ly = e.clientY;
+    });
+    const end = (e) => {
+      if (e.pointerId === dragId) dragId = null;
+      if (e.pointerId === stickId) stickEnd();
+    };
+    canvas.addEventListener("pointerup", end);
+    canvas.addEventListener("pointercancel", end);
+    canvas.addEventListener("lostpointercapture", end);
 
     // Sprint button
     const sp = (on) => {
@@ -246,6 +268,7 @@ export class Player {
       sp(true);
     });
     t.sprint.addEventListener("pointerup", () => sp(false));
+    t.sprint.addEventListener("lostpointercapture", () => sp(false));
     t.sprint.addEventListener("pointercancel", () => sp(false));
 
     // Jump button
@@ -281,7 +304,10 @@ export class Player {
     this.inputMag = m < 0.15 ? 0 : m;
     this.sprinting =
       this.inputMag > 0 &&
-      (k.has("ShiftLeft") || k.has("ShiftRight") || this.sprintTouch);
+      (k.has("ShiftLeft") ||
+        k.has("ShiftRight") ||
+        this.sprintTouch ||
+        Math.hypot(this.joy.x, this.joy.y) > 0.92);
 
     let tx = 0,
       tz = 0;

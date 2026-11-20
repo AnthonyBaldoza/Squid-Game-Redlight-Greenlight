@@ -4,7 +4,11 @@ const BEST = "rlgl.best.v1"; // unchanged: best times are kept
 
 export const isTouch =
   matchMedia("(pointer: coarse)").matches ||
-  /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && matchMedia("(hover: none)").matches);
+// Also true once a real finger has touched the page (covers phones in "desktop site" mode)
+export const touchy = () =>
+  isTouch || document.documentElement.classList.contains("has-touch");
 
 export const PRESETS = {
   low: {
