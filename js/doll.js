@@ -64,8 +64,10 @@ export class Doll {
 
     this.red = false; this.glow = 0;
     this.ua = this.ha = this.uT = this.hT = Math.PI;
-    this.uv = this.hv = 0;
+    this.uv = this.hv = 0; this.nod = 0;
   }
+
+  pulse(s = 1) { this.nod = Math.max(this.nod, s); } // little head nod on each sung syllable
 
   setState(s, instant) {
     this.red = s === 'red';
@@ -76,6 +78,7 @@ export class Doll {
 
   update(dt, t) {
     const r = this.red;
+    this.nod *= Math.exp(-dt * 9);
     const kh = r ? 520 : 70, dh = r ? 30 : 15, ku = r ? 170 : 55, du = r ? 17 : 14;
     const n = Math.ceil(dt / 0.016), h = dt / n;
     for (let i = 0; i < n; i++) {
@@ -91,7 +94,7 @@ export class Doll {
     this.up.rotation.z = Math.sin(t * 1.4) * 0.02 * (1 - k);
     this.arms[0].rotation.x = Math.sin(t * 1.4) * 0.08 * (1 - k);
     this.arms[1].rotation.x = -Math.sin(t * 1.4) * 0.08 * (1 - k);
-    this.head.rotation.x = r ? 0 : Math.sin(t * 2.6) * 0.04;
+    this.head.rotation.x = r ? 0 : Math.sin(t * 2.6) * 0.04 + this.nod * 0.08;
     this.head.rotation.z = r ? Math.sin(t * 55) * 0.012 : 0;
   }
 }

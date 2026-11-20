@@ -10,7 +10,7 @@ Built using **HTML, CSS, Vanilla JavaScript (ES Modules), and Three.js**.
 
 Experience the classic Red Light, Green Light challenge in a 3D environment.
 
-- 🟢 **Green Light:** Run toward the finish line while the doll faces away.
+- 🟢 **Green Light:** Run toward the finish line while the doll faces away and sings *“Mu-gung-hwa kkot-i pi-eot-seum-ni-da”*. The song speeds up and slows down each round. When it ends, she turns around, so freeze on the last note!
 - 🔴 **Red Light:** Stop immediately when the doll turns around and her eyes glow.
 - ⏱️ **Time Limit:** Reach the finish line within 70 seconds.
 - ⚠️ **Elimination:** Moving during Red Light after the 0.4-second reaction window results in elimination.
@@ -114,6 +114,7 @@ Squid-Game-Redlight-Greenlight/
     ├── main.js
     ├── game.js
     ├── player.js
+    ├── models.js
     ├── doll.js
     ├── environment.js
     ├── contestants.js
@@ -132,6 +133,7 @@ Squid-Game-Redlight-Greenlight/
 | `main.js` | Renderer, adaptive resolution, and main game loop |
 | `game.js` | Game state, timers, Red Light detection, and win/lose logic |
 | `player.js` | Player movement, keyboard, mouse, touch, and camera |
+| `models.js` | Shared Roblox-style body parts for the player and contestants |
 | `doll.js` | 3D robotic doll with animated head and body movement |
 | `environment.js` | Arena, sky, field, track, walls, and watchtowers |
 | `contestants.js` | AI-controlled contestants |
@@ -150,7 +152,8 @@ You can modify several gameplay settings directly in the JavaScript files.
 |:---|:---|:---|
 | Time Limit | `js/game.js` | `LIMIT` |
 | Reaction Window | `js/game.js` | `GRACE` |
-| Green Light Duration | `js/game.js` | `beginGreen()` |
+| Chant Speed (Green Light length) | `js/game.js` | `beginGreen()` (`rate`) |
+| Chant Melody & Lyrics | `js/audio.js` | `CHANT` |
 | Red Light Duration | `js/game.js` | `beginRed()` |
 | Track Length | `js/environment.js` | `ARENA.finishZ` |
 | AI Speed | `js/contestants.js` | AI movement settings |
