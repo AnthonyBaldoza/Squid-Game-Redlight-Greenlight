@@ -27,6 +27,139 @@ function tex(w, h, draw, rep) {
   return t;
 }
 
+// ---------- Roblox-style masked guards ----------
+// Each mask type is baked into ONE merged geometry (vertex colours) and drawn with an InstancedMesh,
+// so all guards together cost only 3 draw calls.
+function mergeGeos(list) {
+  const pos = [],
+    nor = [],
+    col = [],
+    idx = [];
+  let off = 0;
+  for (const g of list) {
+    const p = g.attributes.position,
+      n = g.attributes.normal,
+      c = g.attributes.color;
+    for (let i = 0; i < p.count; i++) {
+      pos.push(p.getX(i), p.getY(i), p.getZ(i));
+      nor.push(n.getX(i), n.getY(i), n.getZ(i));
+      col.push(c.getX(i), c.getY(i), c.getZ(i));
+    }
+    const ix = g.index;
+    for (let i = 0; i < ix.count; i++) idx.push(ix.getX(i) + off);
+    off += p.count;
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  m.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+  m.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  m.setIndex(idx);
+  return m;
+}
+
+// kind: 0 = circle mask, 1 = triangle mask (pink jumpsuit), 2 = square mask (black "manager" suit)
+function guardGeometry(kind) {
+  const boss = kind === 2;
+  const SUIT = boss ? 0x18181e : 0xf0447f,
+    HOOD = boss ? 0x0d0d10 : 0xd9306a,
+    MASK = boss ? 0x2b2b33 : 0x0b0b0e;
+  const DARK = 0x0b0b0e,
+    GUN = 0x1a1a1f,
+    WOOD = 0x6b4a2b,
+    MARK = 0xf2f2f2;
+  const parts = [];
+  const paint = (g, hex) => {
+    const c = new THREE.Color(hex),
+      n = g.attributes.position.count,
+      a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      a[i * 3] = c.r;
+      a[i * 3 + 1] = c.g;
+      a[i * 3 + 2] = c.b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(a, 3));
+    parts.push(g);
+  };
+  const pivot = (x, y, z, rx) =>
+    new THREE.Matrix4()
+      .makeTranslation(x, y, z)
+      .multiply(new THREE.Matrix4().makeRotationX(rx));
+  const box = (w, h, d, hex, x, y, z, base) => {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(x, y, z);
+    if (base) g.applyMatrix4(base);
+    paint(g, hex);
+  };
+
+  // legs + boots
+  for (const s of [-1, 1]) {
+    const lp = pivot(s * 0.225, 0.9, 0, 0);
+    box(0.44, 0.9, 0.44, SUIT, 0, -0.45, 0, lp);
+    box(0.48, 0.2, 0.6, DARK, 0, -0.82, -0.06, lp);
+  }
+  // torso + belt
+  box(0.92, 0.9, 0.46, SUIT, 0, 1.35, 0);
+  box(0.95, 0.12, 0.5, DARK, 0, 0.98, 0);
+  // hood + mask plate
+  box(0.64, 0.64, 0.64, HOOD, 0, 2.12, 0.03);
+  box(0.5, 0.5, 0.1, MASK, 0, 2.1, -0.31);
+  // white outline symbol on the mask (circle / triangle / square), faces -Z
+  const ringArgs = [
+    [0.12, 0.165, 28, 0, 0],
+    [0.15, 0.22, 3, Math.PI / 2, -0.03],
+    [0.177, 0.226, 4, Math.PI / 4, 0],
+  ][kind];
+  const ring = new THREE.RingGeometry(ringArgs[0], ringArgs[1], ringArgs[2]);
+  ring.applyMatrix4(
+    new THREE.Matrix4().compose(
+      new THREE.Vector3(0, 2.1 + ringArgs[4], -0.365),
+      new THREE.Quaternion().setFromEuler(
+        new THREE.Euler(0, Math.PI, ringArgs[3]),
+      ),
+      new THREE.Vector3(1, 1, 1),
+    ),
+  );
+  paint(ring, MARK);
+
+  // right arm raised holding the rifle (Roblox "tool" pose), left arm relaxed
+  const ra = pivot(0.69, 1.78, 0, 1.5),
+    la = pivot(-0.69, 1.78, 0, 0.15);
+  for (const a of [ra, la]) {
+    box(0.44, 0.9, 0.44, SUIT, 0, -0.45, 0, a);
+    box(0.46, 0.22, 0.46, DARK, 0, -0.8, 0, a);
+  }
+  // rifle
+  box(0.12, 0.15, 1.3, GUN, 0.69, 1.45, -0.9); // body
+  box(0.1, 0.3, 0.14, GUN, 0.69, 1.55, -0.78); // grip
+  box(0.1, 0.32, 0.16, GUN, 0.69, 1.25, -0.9); // magazine
+  box(0.12, 0.2, 0.4, WOOD, 0.69, 1.5, -0.2); // stock
+  box(0.14, 0.16, 0.45, WOOD, 0.69, 1.45, -1.2); // foregrip
+  box(0.06, 0.1, 0.2, GUN, 0.69, 1.57, -1.3); // sight
+  box(0.07, 0.07, 0.25, DARK, 0.69, 1.47, -1.6); // muzzle
+  return mergeGeos(parts);
+}
+
+function buildGuards(parent, spots) {
+  const kinds = spots.map((_, k) => (k % 7 === 3 ? 2 : k % 2));
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const D = new THREE.Object3D();
+  for (let kind = 0; kind < 3; kind++) {
+    const mine = spots.filter((_, k) => kinds[k] === kind);
+    if (!mine.length) continue;
+    const mesh = new THREE.InstancedMesh(guardGeometry(kind), mat, mine.length);
+    mesh.castShadow = true;
+    mesh.frustumCulled = false;
+    mine.forEach((p, i) => {
+      D.position.set(p[0], 0, p[1]);
+      D.rotation.set(0, p[2] + rnd(-0.12, 0.12), 0);
+      D.scale.setScalar(1.05);
+      D.updateMatrix();
+      mesh.setMatrixAt(i, D.matrix);
+    });
+    parent.add(mesh);
+  }
+}
+
 export function createEnvironment(scene) {
   const A = ARENA,
     D = new THREE.Object3D(),
@@ -337,35 +470,16 @@ export function createEnvironment(scene) {
   // ---- Detail group (guards, booths): hidden on LOW ----
   const details = new THREE.Group();
   scene.add(details);
-  const pinkMat = lam(0xf0447f),
-    blackMat = lam(0x0b0b0e),
-    guardBody = new THREE.CapsuleGeometry(0.32, 0.9, 3, 8),
-    guardHead = new THREE.SphereGeometry(0.3, 10, 8),
-    rifle = new THREE.BoxGeometry(0.12, 0.12, 1.1);
-  const guardAt = (x, z, ry) => {
-    const g = new THREE.Group();
-    g.position.set(x, 0, z);
-    g.rotation.y = ry;
-    const b = new THREE.Mesh(guardBody, pinkMat);
-    b.position.y = 1.0;
-    b.castShadow = true;
-    g.add(b);
-    const h = new THREE.Mesh(guardHead, blackMat);
-    h.position.y = 1.95;
-    g.add(h);
-    const r = new THREE.Mesh(rifle, blackMat);
-    r.position.set(0.3, 1.2, -0.4);
-    g.add(r);
-    details.add(g);
-  };
+  const guardSpots = [];
   [-16, 16].forEach((x) => {
     for (let i = 0; i < 4; i++)
-      guardAt(x, -88 - i * 6, x < 0 ? -Math.PI / 2 : Math.PI / 2);
+      guardSpots.push([x, -88 - i * 6, x < 0 ? -Math.PI / 2 : Math.PI / 2]);
   });
   [-15, 15].forEach((x) => {
     for (let i = 0; i < 3; i++)
-      guardAt(x, -20 - i * 25, x < 0 ? -Math.PI / 2 : Math.PI / 2);
+      guardSpots.push([x, -20 - i * 25, x < 0 ? -Math.PI / 2 : Math.PI / 2]);
   });
+  buildGuards(details, guardSpots);
   const boothGeo = new THREE.BoxGeometry(4, 3.4, 4);
   [-20, 20].forEach((x) => {
     const b = new THREE.Mesh(boothGeo, lam(0x4c5566));
