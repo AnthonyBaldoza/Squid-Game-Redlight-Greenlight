@@ -1,6 +1,16 @@
 import * as THREE from "three";
 import { ARENA } from "./environment.js";
 import { Sound } from "./audio.js";
+import {
+  PIV,
+  torsoGeo,
+  headGeo,
+  faceGeo,
+  hairGeo,
+  armGeo,
+  handGeo,
+  legGeo,
+} from "./models.js";
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -28,68 +38,48 @@ export class Player {
   }
 
   build(scene) {
-    // Roblox-style (R6-like) blocky character. Model faces -Z, back is +Z.
+    // Roblox-style character made of merged, vertex-coloured parts (see models.js). Faces -Z, back is +Z.
     const g = (this.group = new THREE.Group());
     g.rotation.order = "YXZ";
     g.scale.setScalar(0.85);
     scene.add(g);
-    const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
-    const suit = lam(0x20c8b6),
-      pants = lam(0x159a8b),
-      skin = lam(0xf5cd9b),
-      hair = lam(0x1a1210),
-      white = lam(0xffffff);
-    const box = (w, h, d, mat, parent, x, y, z, shadow = true) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-      m.position.set(x, y, z);
+    const C = {
+      suit: 0x23c9b4,
+      suitDark: 0x15998a,
+      trim: 0xffffff,
+      skin: 0xf5cd9b,
+      hair: 0x1a1210,
+      shoe: 0xffffff,
+      sole: 0x222226,
+      dark: 0x1a1a1a,
+      armband: 0xed1b76,
+    };
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const mesh = (geo, parent, shadow = true) => {
+      const m = new THREE.Mesh(geo, mat);
       m.castShadow = shadow;
       parent.add(m);
       return m;
     };
-    box(0.92, 0.9, 0.46, suit, g, 0, 1.35, 0); // torso
-    box(0.56, 0.56, 0.56, skin, g, 0, 2.1, 0); // head
-    box(0.6, 0.3, 0.62, hair, g, 0, 2.27, 0.02, false); // hair
-
+    mesh(torsoGeo(C), g);
+    mesh(headGeo(C), g);
+    mesh(faceGeo(C), g, false);
+    mesh(hairGeo(C), g, false);
     this.legs = [];
     this.arms = [];
     for (const s of [-1, 1]) {
       const l = new THREE.Group();
-      l.position.set(s * 0.225, 0.9, 0);
+      l.position.set(s * PIV.legX, PIV.legY, 0);
       g.add(l);
-      box(0.44, 0.9, 0.44, pants, l, 0, -0.45, 0);
-      box(0.46, 0.16, 0.54, white, l, 0, -0.82, -0.04, false); // sneaker
+      mesh(legGeo(C, s), l);
       this.legs.push(l);
       const a = new THREE.Group();
-      a.position.set(s * 0.69, 1.78, 0);
+      a.position.set(s * PIV.armX, PIV.armY, 0);
       g.add(a);
-      box(0.44, 0.9, 0.44, suit, a, 0, -0.45, 0);
-      box(0.045, 0.9, 0.2, white, a, s * 0.225, -0.45, 0, false); // sleeve stripe
-      box(0.46, 0.2, 0.46, skin, a, 0, -0.8, 0, false); // hand
+      mesh(armGeo(C, s, s < 0), a);
+      mesh(handGeo(C), a, false);
       this.arms.push(a);
     }
-
-    // Roblox smile on the front of the head (-Z)
-    const fc = document.createElement("canvas");
-    fc.width = fc.height = 64;
-    const f = fc.getContext("2d");
-    f.fillStyle = "#1a1a1a";
-    f.fillRect(16, 20, 8, 12);
-    f.fillRect(40, 20, 8, 12);
-    f.strokeStyle = "#1a1a1a";
-    f.lineWidth = 4;
-    f.lineCap = "round";
-    f.beginPath();
-    f.arc(32, 34, 14, Math.PI * 0.25, Math.PI * 0.75);
-    f.stroke();
-    const ft = new THREE.CanvasTexture(fc);
-    ft.colorSpace = THREE.SRGBColorSpace;
-    const face = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.5, 0.5),
-      new THREE.MeshBasicMaterial({ map: ft, transparent: true }),
-    );
-    face.position.set(0, 2.08, -0.285);
-    face.rotation.y = Math.PI;
-    g.add(face);
 
     // Number plate on the back
     const c = document.createElement("canvas");
@@ -97,8 +87,11 @@ export class Player {
     const x = c.getContext("2d");
     x.fillStyle = "#fff";
     x.fillRect(0, 0, 64, 64);
+    x.strokeStyle = "#111";
+    x.lineWidth = 3;
+    x.strokeRect(2, 2, 60, 60);
     x.fillStyle = "#111";
-    x.font = "700 30px Arial";
+    x.font = "700 28px Arial";
     x.textAlign = "center";
     x.textBaseline = "middle";
     x.fillText("456", 32, 34);

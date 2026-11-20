@@ -1,8 +1,20 @@
 import * as THREE from "three";
 import { ARENA } from "./environment.js";
+import {
+  PIV,
+  WHITE,
+  torsoGeo,
+  headGeo,
+  faceGeo,
+  hairGeo,
+  hairLongGeo,
+  armGeo,
+  handGeo,
+  legGeo,
+} from "./models.js";
 
-// ~24 AI contestants with Roblox-style blocky bodies (torso, head, hair, 2 arms, 2 legs).
-// Drawn with 5 InstancedMeshes total. No pathfinding, no physics.
+// ~24 AI contestants with detailed Roblox-style bodies: tracksuit with white collar + stripes, sneakers,
+// hands, ears, face, hair (short or long) and a unique number plate. Everything is drawn with InstancedMeshes.
 const P = new THREE.Matrix4(),
   L = new THREE.Matrix4(),
   Q = new THREE.Quaternion(),
@@ -10,11 +22,54 @@ const P = new THREE.Matrix4(),
 const V = new THREE.Vector3(),
   SC = new THREE.Vector3(),
   C = new THREE.Color();
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+const DEAD = new THREE.Color().setRGB(0.5, 0.28, 0.3);
 const SKIN = [0xf1cba8, 0xe0ac82, 0xc68a62, 0x8d5a3c, 0xf6d9c0];
-const HAIR = [0x111111, 0x2a1a10, 0x3b2416, 0x5a3a22, 0x1a1a22];
+const HAIR = [0x111111, 0x2a1a10, 0x3b2416, 0x5a3a22, 0x1a1a22, 0x6b4a2b];
 const HALF = Math.PI / 2;
 const BASE = 0.85; // same scale as the player model
+const COLS = 8,
+  ROWS = 4;
 const rnd = (a, b) => a + Math.random() * (b - a);
+
+// Palette: skin / hair are WHITE here because they are tinted per instance
+const PAL = {
+  suit: 0x2f9f90,
+  suitDark: 0x1f7a6e,
+  trim: 0xffffff,
+  skin: WHITE,
+  hair: WHITE,
+  shoe: 0xffffff,
+  sole: 0x222226,
+  dark: 0x1a1a1a,
+};
+
+// Number plate atlas (8 x 4 cells of 64px): each contestant picks its own cell via an instanced attribute
+function makeAtlas(nums) {
+  const c = document.createElement("canvas");
+  c.width = COLS * 64;
+  c.height = ROWS * 64;
+  const x = c.getContext("2d");
+  x.textAlign = "center";
+  x.textBaseline = "middle";
+  x.font = "700 26px Arial";
+  nums.forEach((n, i) => {
+    const cx = (i % COLS) * 64,
+      cy = Math.floor(i / COLS) * 64;
+    x.fillStyle = "#f4f4f4";
+    x.fillRect(cx, cy, 64, 64);
+    x.strokeStyle = "#111";
+    x.lineWidth = 3;
+    x.strokeRect(cx + 2, cy + 2, 60, 60);
+    x.fillStyle = "#111";
+    x.fillText(String(n).padStart(3, "0"), cx + 32, cy + 34);
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 2;
+  t.repeat.set(1 / COLS, 1 / ROWS);
+  return t;
+}
 
 export class Contestants {
   constructor(scene, onEliminated) {
@@ -31,56 +86,94 @@ export class Contestants {
     }
     const N = (this.n = spots.length);
 
-    // oy shifts the geometry so limbs pivot from the shoulder / hip
-    const box = (w, h, d, oy) => {
-      const g = new THREE.BoxGeometry(w, h, d);
-      g.translate(0, oy, 0);
-      return g;
+    // unique random numbers (the player is 456)
+    const pool = [];
+    while (pool.length < N) {
+      const v = 1 + Math.floor(Math.random() * 455);
+      if (!pool.includes(v)) pool.push(v);
+    }
+    const offs = new Float32Array(N * 2);
+    pool.forEach((_, i) => {
+      offs[i * 2] = (i % COLS) / COLS;
+      offs[i * 2 + 1] = 1 - (Math.floor(i / COLS) + 1) / ROWS;
+    });
+    const plateGeo = new THREE.PlaneGeometry(0.5, 0.5);
+    plateGeo.setAttribute(
+      "cellOff",
+      new THREE.InstancedBufferAttribute(offs, 2),
+    );
+    const plateMat = new THREE.MeshBasicMaterial({ map: makeAtlas(pool) });
+    plateMat.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader
+        .replace(
+          "#include <common>",
+          "attribute vec2 cellOff;\n#include <common>",
+        )
+        .replace(
+          "#include <uv_vertex>",
+          "#include <uv_vertex>\n  vMapUv += cellOff;",
+        );
     };
-    const mk = (geo, count, shadow) => {
-      const m = new THREE.InstancedMesh(
-        geo,
-        new THREE.MeshLambertMaterial(),
-        count,
-      );
+
+    const lam = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const mk = (geo, mat, count, shadow) => {
+      const m = new THREE.InstancedMesh(geo, mat, count);
       m.castShadow = shadow;
       m.frustumCulled = false;
       scene.add(m);
       return m;
     };
-    this.torso = mk(box(0.92, 0.9, 0.46, 0), N, true);
-    this.head = mk(box(0.56, 0.56, 0.56, 0), N, true);
-    this.hair = mk(box(0.6, 0.3, 0.62, 0), N, false);
-    this.arms = mk(box(0.44, 0.9, 0.44, -0.45), N * 2, false);
-    this.legs = mk(box(0.44, 0.9, 0.44, -0.45), N * 2, true);
-    this.meshes = [this.torso, this.head, this.hair, this.arms, this.legs];
+    this.torso = mk(torsoGeo(PAL), lam, N, true);
+    this.head = mk(headGeo(PAL), lam, N, true);
+    this.face = mk(faceGeo(PAL), lam, N, false);
+    this.hair = mk(hairGeo(PAL), lam, N, false);
+    this.hairLong = mk(hairLongGeo(PAL), lam, N, false);
+    this.armL = mk(armGeo(PAL, -1), lam, N, false);
+    this.armR = mk(armGeo(PAL, 1), lam, N, false);
+    this.hands = mk(handGeo(PAL), lam, N * 2, false);
+    this.legL = mk(legGeo(PAL, -1), lam, N, true);
+    this.legR = mk(legGeo(PAL, 1), lam, N, true);
+    this.plate = mk(plateGeo, plateMat, N, false);
+    this.meshes = [
+      this.torso,
+      this.head,
+      this.face,
+      this.hair,
+      this.hairLong,
+      this.armL,
+      this.armR,
+      this.hands,
+      this.legL,
+      this.legR,
+      this.plate,
+    ];
 
-    this.list = spots.map((s, i) => ({
-      i,
-      sx: s[0] + rnd(-0.25, 0.25),
-      sz: s[1] + rnd(-0.2, 0.2),
-      speed: rnd(3.2, 6.2),
-      fr: rnd(1, 2.5),
-      ph: rnd(0, 6),
-      h: rnd(0.93, 1.07),
-      bodyCol: new THREE.Color().setHSL(
-        rnd(0.46, 0.5),
-        rnd(0.45, 0.6),
-        rnd(0.22, 0.36),
-      ),
-      skinCol: new THREE.Color(SKIN[i % SKIN.length]),
-      hairCol: new THREE.Color(HAIR[(i * 3) % HAIR.length]),
-    }));
+    this.list = spots.map((s, i) => {
+      const b = rnd(0.86, 1.06);
+      return {
+        i,
+        sx: s[0] + rnd(-0.25, 0.25),
+        sz: s[1] + rnd(-0.2, 0.2),
+        speed: rnd(3.2, 6.2),
+        fr: rnd(1, 2.5),
+        ph: rnd(0, 6),
+        h: rnd(0.93, 1.07),
+        tint: new THREE.Color().setRGB(b, b, b),
+        long: Math.random() < 0.35,
+        skinCol: new THREE.Color(SKIN[i % SKIN.length]),
+        hairCol: new THREE.Color(HAIR[(i * 3) % HAIR.length]),
+      };
+    });
     this.reset();
   }
 
   paintBody(c, col) {
     const i = c.i;
     this.torso.setColorAt(i, col);
-    this.arms.setColorAt(i * 2, col);
-    this.arms.setColorAt(i * 2 + 1, col);
-    this.legs.setColorAt(i * 2, col);
-    this.legs.setColorAt(i * 2 + 1, col);
+    this.armL.setColorAt(i, col);
+    this.armR.setColorAt(i, col);
+    this.legL.setColorAt(i, col);
+    this.legR.setColorAt(i, col);
   }
   flushColors() {
     for (const m of this.meshes)
@@ -107,9 +200,13 @@ export class Contestants {
       c.phase = 0;
       c.amp = 0;
       c.finishZ = ARENA.finishZ - 1.5 - rnd(0, 6);
-      this.paintBody(c, c.bodyCol);
+      this.paintBody(c, c.tint);
       this.head.setColorAt(c.i, c.skinCol);
+      this.hands.setColorAt(c.i * 2, c.skinCol);
+      this.hands.setColorAt(c.i * 2 + 1, c.skinCol);
       this.hair.setColorAt(c.i, c.hairCol);
+      this.hairLong.setColorAt(c.i, c.hairCol);
+      if (!c.long) this.hairLong.setMatrixAt(c.i, ZERO);
     }
     this.flushColors();
     this.write(0, 0, true);
@@ -141,7 +238,7 @@ export class Contestants {
     c.moving = false;
     c.fall = 0;
     this.alive--;
-    this.paintBody(c, C.setHex(0x7a2430));
+    this.paintBody(c, DEAD);
     this.flushColors();
     this.onEliminated(c);
   }
@@ -185,7 +282,7 @@ export class Contestants {
     this.write(camX, camZ, false);
   }
 
-  // local part transform (relative to the body root P), written into an instance slot
+  // part transform relative to the body root P, written into an instance slot
   put(mesh, idx, x, y, z, rx) {
     E.set(rx, 0, 0);
     Q.setFromEuler(E);
@@ -212,13 +309,18 @@ export class Contestants {
       P.compose(V, Q, SC);
       const sw = Math.sin(c.phase) * 0.9 * c.amp,
         i = c.i;
-      this.put(this.torso, i, 0, 1.35, 0, 0);
-      this.put(this.head, i, 0, 2.1, 0, 0);
-      this.put(this.hair, i, 0, 2.27, 0.02, 0);
-      this.put(this.arms, i * 2, -0.69, 1.78, 0, -sw);
-      this.put(this.arms, i * 2 + 1, 0.69, 1.78, 0, sw);
-      this.put(this.legs, i * 2, -0.225, 0.9, 0, sw);
-      this.put(this.legs, i * 2 + 1, 0.225, 0.9, 0, -sw);
+      this.put(this.torso, i, 0, 0, 0, 0);
+      this.put(this.head, i, 0, 0, 0, 0);
+      this.put(this.face, i, 0, 0, 0, 0);
+      this.put(this.hair, i, 0, 0, 0, 0);
+      if (c.long) this.put(this.hairLong, i, 0, 0, 0, 0);
+      this.put(this.plate, i, 0, 1.38, 0.235, 0);
+      this.put(this.armL, i, -PIV.armX, PIV.armY, 0, -sw);
+      this.put(this.armR, i, PIV.armX, PIV.armY, 0, sw);
+      this.put(this.hands, i * 2, -PIV.armX, PIV.armY, 0, -sw);
+      this.put(this.hands, i * 2 + 1, PIV.armX, PIV.armY, 0, sw);
+      this.put(this.legL, i, -PIV.legX, PIV.legY, 0, sw);
+      this.put(this.legR, i, PIV.legX, PIV.legY, 0, -sw);
     }
     for (const m of this.meshes) m.instanceMatrix.needsUpdate = true;
   }
