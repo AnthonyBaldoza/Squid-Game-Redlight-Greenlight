@@ -18,6 +18,7 @@ const LIMIT = 70; // seconds to reach the finish line
 const TURN_LEAD = 0.22; // the doll starts turning this long before the song ends, so her face arrives with the last note
 const INTRO_DUR = 7.8; // cinematic intro length (camera shots are timed in CameraRig 'cinema')
 const GRACE = 0.5; // reaction window after Red Light starts: the player must stop on their own (no auto-brake)
+const SLIDE = 0.25; // after the window, the leftover slide from letting go is forgiven this long (only real input / a new jump counts first)
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
@@ -47,6 +48,7 @@ export class Game {
   resetWorld() {
     this.player.reset();
     this.contestants.reset();
+    this.particles.reset();
     this.doll.setState("green", true);
     this.timeLeft = LIMIT;
     this.elapsed = 0;
@@ -71,6 +73,7 @@ export class Game {
   // quick = true for retries (short camera swoop); false = full cinematic intro with title card
   start(quick) {
     this.paused = false;
+    Sound.resume(); // e.g. RESTART from the pause menu: audio was held suspended
     Sound.musicStop();
     this.resetWorld();
     this.player.active = true;
@@ -302,19 +305,21 @@ export class Game {
       meters: this.metersNow(),
       reason: "MOVED DURING RED LIGHT",
     };
-    this.player.fall();
-    // Drama: gunshot, white-to-red flash, slow motion, and a hard cut to the doll staring at you
+    const px = this.player.pos.x,
+      pz = this.player.pos.z,
+      dir = px >= 0 ? -1 : 1; // the guard is on the player's side of the track, the bullet travels toward the middle
+    this.player.fall(dir);
+    // Drama, in beats (real time, see update()): 0 hit = gunshot + flash + slow motion + punch-in on the player,
+    // 0.55 cut to the doll staring at you, 1.3 cut to the fallen player with the red vignette, 3.3 game over screen
     this.timeScale = 0.2;
+    this.cutDoll = false;
     this.doomCut = false;
     Sound.gunshot(false);
     UI.flash(true);
-    UI.notify("ELIMINATED");
-    this.rig.setMode("doll");
+    this.rig.setMode("shot");
     this.rig.shake(0.5);
-    const px = this.player.pos.x,
-      pz = this.player.pos.z;
     this.particles.shoot(px >= 0 ? 15.5 : -15.5, 1.6, pz - 3, px, 1.2, pz);
-    this.particles.burst(px, 1.2, pz, 0xff3355, 40, 7);
+    this.particles.splat(px, 1.2, pz, dir, 1);
   }
 
   timeUp() {
@@ -373,8 +378,8 @@ export class Game {
           }
           if (
             p.inputMag > 0.25 ||
-            p.disp > 0.8 ||
-            p.jumpCount !== this.jumpMark
+            p.jumpCount !== this.jumpMark ||
+            (this.phaseT > GRACE + SLIDE && p.disp > 0.8) // creeping with a tiny stick tilt still gets caught
           ) {
             this.eliminate();
             break;
@@ -389,15 +394,22 @@ export class Game {
       case S.ELIMINATED: {
         p.update(dt, true);
         this.endT += rdt; // timeline runs in real time
-        if (!this.doomCut && this.endT > 1.0) {
+        if (!this.cutDoll && this.endT > 0.55) {
+          this.cutDoll = true;
+          this.rig.setMode("doll");
+          UI.notify("ELIMINATED");
+        } // cut to the doll
+        if (!this.doomCut && this.endT > 1.3) {
           this.doomCut = true;
           this.rig.setMode("dead");
+          UI.deathFx(true);
+          Sound.deathSting();
         } // cut back to the fallen player
         this.timeScale =
-          this.endT < 1.3
+          this.endT < 1.5
             ? 0.2
-            : Math.min(1, 0.2 + ((this.endT - 1.3) / 0.7) * 0.8); // ease back to normal speed
-        if (this.endT > 2.7) {
+            : Math.min(1, 0.2 + ((this.endT - 1.5) / 0.8) * 0.8); // ease back to normal speed
+        if (this.endT > 3.3) {
           this.state = S.GAMEOVER;
           this.timeScale = 1;
           Sound.gameOver();

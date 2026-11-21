@@ -213,6 +213,10 @@ export const UI = {
     el.style.animation = "";
     noteTimer = setTimeout(() => el.classList.add("hidden"), 1800);
   },
+  // Dark red vignette that closes in on the fallen player (a plain overlay, no CSS filter over the canvas)
+  deathFx(on) {
+    $("edge").className = on ? "edge-dead" : "";
+  },
   flash(hard) {
     const f = $("flash");
     f.classList.remove("on", "hard");

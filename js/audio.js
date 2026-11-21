@@ -9,7 +9,8 @@ let timer = null,
   step = 0,
   musicOn = false;
 let volume = 0.7,
-  muted = false;
+  muted = false,
+  held = false; // true while the game is paused / tab hidden: a stray click must not wake the audio
 
 const mtof = (n) => 440 * Math.pow(2, (n - 69) / 12);
 const BASS = [45, 45, 57, 45, 48, 45, 57, 52, 45, 45, 57, 45, 43, 45, 55, 50];
@@ -181,7 +182,7 @@ function chantSyl(bus, t, dur, s) {
 export const Sound = {
   init() {
     if (ctx) {
-      if (ctx.state === "suspended") ctx.resume();
+      if (ctx.state === "suspended" && !held) ctx.resume();
       return;
     }
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -215,9 +216,11 @@ export const Sound = {
     s.start();
   },
   suspend() {
+    held = true;
     if (ctx && ctx.state === "running") ctx.suspend();
   },
   resume() {
+    held = false;
     if (ctx && ctx.state === "suspended") ctx.resume();
   },
   setVolume(v) {
@@ -358,5 +361,12 @@ export const Sound = {
   },
   gameOver() {
     if (ctx) osc("sawtooth", 220, 55, 0.9, 0.35);
+  },
+  // Low sinking drone under the fallen-player shot (the gunshot already has the ringing + heartbeat)
+  deathSting() {
+    if (!ctx) return;
+    osc("sawtooth", 196, 49, 1.8, 0.12);
+    osc("sine", 98, 33, 1.7, 0.35);
+    noise(1.4, 0.1, "lowpass", 1200, 1, 0, null, 120);
   },
 };

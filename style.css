@@ -71,6 +71,23 @@ button {
     rgba(255, 43, 58, 0.55) 100%
   );
 }
+#edge.edge-dead {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0) 18%,
+    rgba(70, 0, 8, 0.55) 58%,
+    rgba(18, 0, 2, 0.93) 100%
+  );
+  animation: deadIn 1.1s ease-out both;
+}
+@keyframes deadIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
 #flash {
   background: #ff1030;
   opacity: 0;

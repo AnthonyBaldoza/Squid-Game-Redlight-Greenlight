@@ -363,7 +363,8 @@ export class Contestants {
       const bob = c.moving ? Math.abs(Math.sin(c.phase)) * 0.05 : 0;
       E.set(-a, 0, 0);
       Q.setFromEuler(E);
-      V.set(c.x, bob, c.z);
+      // a fallen body pivots around the feet, so lift it by about half its thickness or it sinks into the ground
+      V.set(c.x, bob + Math.sin(c.fall) * 0.26 * s, c.z);
       SC.set(s, s, s);
       P.compose(V, Q, SC);
       const sw = Math.sin(c.phase) * 0.9 * c.amp,

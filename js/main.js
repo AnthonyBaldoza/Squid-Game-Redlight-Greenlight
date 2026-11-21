@@ -51,7 +51,7 @@ const player = new Player(scene, canvas, {
 const contestants = new Contestants(scene, (c) => {
   Sound.gunshot(Math.abs(c.z - player.pos.z) > 25);
   particles.shoot(c.x >= 0 ? 15.5 : -15.5, 1.6, c.z - 2, c.x, 1.1, c.z);
-  particles.burst(c.x, 1.2, c.z, 0xff3355, 18, 4);
+  particles.splat(c.x, 1.2, c.z, c.x >= 0 ? -1 : 1, 0.6);
   game.onContestantDown(c);
 });
 const rig = new CameraRig(camera, player);

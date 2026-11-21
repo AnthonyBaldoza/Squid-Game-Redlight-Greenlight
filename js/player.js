@@ -133,12 +133,20 @@ export class Player {
     this.stunT = 0;
     this.stagger = 0;
     this.jumpCount = 0;
+    this.fallT = 0;
+    this.fallRoll = 0;
+    for (const a of this.arms) a.rotation.z = 0;
     this.group.position.copy(this.pos);
     this.group.rotation.set(0, 0, 0);
   }
 
-  fall() {
+  // Shot. dir = +1 / -1: the side the bullet pushes the body toward (X). Only used after elimination, so it never affects fairness.
+  fall(dir = 1) {
     this.down = true;
+    this.fallT = 0;
+    this.fallRoll = dir * 0.5;
+    this.vel.x += dir * 9; // the impact throws the body a little
+    this.vel.z -= 1.5;
   }
 
   // Shoved by a collision / falling body. Applied outside update(), so it never counts as "movement" on Red Light.
@@ -392,12 +400,24 @@ export class Player {
     this.legs[1].rotation.x = -sw;
     this.arms[0].rotation.x = -sw;
     this.arms[1].rotation.x = sw;
-    if (this.down && this.fallA < Math.PI / 2)
-      this.fallA = Math.min(Math.PI / 2, this.fallA + dt * 3);
+    if (this.down) {
+      // hit reaction: jerk backwards from the impact, drop face-first (accelerating), settle with a small bounce
+      const ft = (this.fallT += dt);
+      const hit = ft < 0.16 ? -0.32 * Math.sin((ft / 0.16) * Math.PI) : 0;
+      const u = clamp((ft - 0.12) / 0.5, 0, 1);
+      const bounce =
+        ft > 0.62
+          ? Math.exp(-(ft - 0.62) * 8) * Math.sin((ft - 0.62) * 24) * 0.06
+          : 0;
+      this.fallA = hit + (Math.PI / 2) * u * u + bounce;
+      const flare = Math.sin(Math.min(1, ft / 0.3) * (Math.PI / 2)); // arms fling outward
+      this.arms[0].rotation.z = -flare;
+      this.arms[1].rotation.z = flare;
+    }
     this.group.position.set(
       this.pos.x,
       this.y +
-        Math.sin(this.fallA) * 0.3 +
+        Math.sin(Math.max(0, this.fallA)) * 0.3 +
         (this.grounded
           ? Math.abs(Math.sin(this.phase)) * 0.06 * Math.min(sp / 5, 1)
           : 0),
@@ -406,7 +426,8 @@ export class Player {
     this.group.rotation.set(
       -this.fallA + clamp(this.stunT / 0.3, 0, 1) * 0.4,
       this.heading,
-      this.stagger * 0.3,
+      this.stagger * 0.3 +
+        (this.down ? this.fallRoll * clamp(this.fallT / 0.5, 0, 1) : 0),
     );
     this.marker.visible = !this.down;
     this.marker.position.set(
@@ -436,8 +457,8 @@ export class CameraRig {
   setMode(m) {
     this.mode = m;
     this.modeT = 0;
-    this.snap = m === "doll" || m === "dead";
-  } // doll / dead are hard cuts
+    this.snap = m === "doll" || m === "dead" || m === "shot";
+  } // doll / dead / shot are hard cuts
   shake(a) {
     this.shakeA = Math.max(this.shakeA, a);
   }
@@ -544,6 +565,13 @@ export class CameraRig {
       const a = Math.sin(this.modeT * 0.6) * 0.8;
       this.des.set(p.pos.x + Math.sin(a) * 6, 2.4, p.pos.z - 7);
       this.lt.set(p.pos.x, 1.7, p.pos.z);
+    } else if (this.mode === "shot") {
+      // the moment of the hit: low camera in front of the player, punching in on the face
+      const s = Math.min(this.modeT / 0.1, 1);
+      this.des.set(p.pos.x + 0.9 - s * 0.5, 1.6, p.pos.z - 3.4 + s * 1.0);
+      this.lt.set(p.pos.x, 1.7, p.pos.z);
+      fovT = (cam.aspect < 1 ? 54 : 44) - s * 10;
+      k = 1;
     } else if (this.mode === "doll") {
       // close-up of the doll staring at you (in the red state her face points toward +Z)
       this.des.set(6.5, 12.6, Math.min(-99 + this.modeT * 1.2, -96));
@@ -583,7 +611,9 @@ export class CameraRig {
     cam.lookAt(this.look);
 
     this.kick *= Math.exp(-dt * 7);
-    this.fov += (fovT - this.fov) * (1 - Math.exp(-dt * 6));
+    if (this.mode === "shot")
+      this.fov = fovT; // slow motion would make the usual smoothing crawl
+    else this.fov += (fovT - this.fov) * (1 - Math.exp(-dt * 6));
     const f = this.fov - this.kick * 8;
     if (Math.abs(cam.fov - f) > 0.01) {
       cam.fov = f;

@@ -13,9 +13,9 @@ Experience the classic Red Light, Green Light challenge in a 3D environment.
 - 🟢 **Green Light:** Run toward the finish line while the doll faces away and sings _“Mu-gung-hwa kkot-i pi-eot-seum-ni-da”_. The song speeds up and slows down each round. When it ends, she turns around, so freeze on the last note!
 - 🔴 **Red Light:** Stop immediately when the doll turns around and her eyes glow.
 - ⏱️ **Time Limit:** Reach the finish line within 70 seconds.
-- ⚠️ **Elimination:** Your character does NOT stop by itself. Let go of the controls when the doll turns. Moving (or jumping) after the 0.5-second reaction window results in elimination. Being shoved by others never counts.
+- ⚠️ **Elimination:** Your character does NOT stop by itself. Let go of the controls when the doll turns. Moving (or jumping) after the 0.5-second reaction window results in elimination. If you let go in time, the little slide your character still does while slowing down is forgiven for a further 0.25 s (so you really do have the full 0.5 s). Being shoved by others never counts.
 - 🤖 **AI Contestants:** Compete alongside approximately 24 AI contestants. You bump into them, and if one is eliminated right next to you, the falling body can shove or trip you (jump to dodge it).
-- 💥 **Dramatic Elimination:** A gunshot with tracer fire, a white-to-red flash, slow motion, and a hard cut to the doll staring at you before the game over screen.
+- 💥 **Dramatic Elimination:** A gunshot with muzzle sparks and tracer fire, a white-to-red flash and slow motion while the camera punches in on your face as you jerk back from the hit. Red splatter and a shockwave burst out, then hard cuts to the doll staring at you and to your body dropping face-first onto a spreading red stain under a closing dark-red vignette, with a low sinking drone, before the game over screen. Eliminated contestants get a smaller splatter and leave a stain too.
 - 🌇 **Time of Day:** Choose DAY, AFTERNOON or SUNSET in Settings (different sky, fog, lighting, and a visible sun at sunset).
 - 🎬 **Cinematic Intro:** The first start from the main menu plays a camera flight with a title card (tap or press any key to skip). Retrying skips straight to the countdown.
 - 🏆 **Best Time:** Your best completion time is saved using browser `localStorage`.
@@ -59,7 +59,7 @@ This project uses JavaScript ES modules, so it must run through a local HTTP ser
 **2. Start a local Python server:**
 
 ```bash
-cd red-light-green-light
+cd Squid-Game-Redlight-Greenlight
 python -m http.server 8000
 ```
 
@@ -131,22 +131,22 @@ Squid-Game-Redlight-Greenlight/
 
 ### File Descriptions
 
-| File             | Description                                                   |
-| :--------------- | :------------------------------------------------------------ |
-| `index.html`     | Main markup, screens, HUD, and Three.js import map            |
-| `style.css`      | Menu styling, HUD, and touch controls                         |
-| `main.js`        | Renderer, adaptive resolution, and main game loop             |
-| `game.js`        | Game state, timers, Red Light detection, and win/lose logic   |
-| `player.js`      | Player movement, keyboard, mouse, touch, and camera           |
-| `models.js`      | Shared Roblox-style body parts for the player and contestants |
-| `doll.js`        | 3D robotic doll with animated head and body movement          |
-| `environment.js` | Arena, sky, field, track, walls, and watchtowers              |
-| `contestants.js` | AI-controlled contestants                                     |
-| `particles.js`   | Elimination effects and confetti                              |
-| `audio.js`       | Procedural sound effects and background music                 |
-| `settings.js`    | Graphics presets and saved settings                           |
-| `share.js`       | Result card image and Facebook / system sharing               |
-| `ui.js`          | Menus, HUD, and notifications                                 |
+| File             | Description                                                    |
+| :--------------- | :------------------------------------------------------------- |
+| `index.html`     | Main markup, screens, HUD, and Three.js import map             |
+| `style.css`      | Menu styling, HUD, and touch controls                          |
+| `main.js`        | Renderer, adaptive resolution, and main game loop              |
+| `game.js`        | Game state, timers, Red Light detection, and win/lose logic    |
+| `player.js`      | Player movement, keyboard, mouse, touch, and camera            |
+| `models.js`      | Shared Roblox-style body parts for the player and contestants  |
+| `doll.js`        | 3D robotic doll with animated head and body movement           |
+| `environment.js` | Arena, sky, field, track, walls, and watchtowers               |
+| `contestants.js` | AI-controlled contestants                                      |
+| `particles.js`   | Death effects (splatter, shockwave, stains, tracers), confetti |
+| `audio.js`       | Procedural sound effects and background music                  |
+| `settings.js`    | Graphics presets and saved settings                            |
+| `share.js`       | Result card image and Facebook / system sharing                |
+| `ui.js`          | Menus, HUD, and notifications                                  |
 
 ---
 
@@ -158,6 +158,7 @@ You can modify several gameplay settings directly in the JavaScript files.
 | :------------------------------- | :------------------ | :---------------------- |
 | Time Limit                       | `js/game.js`        | `LIMIT`                 |
 | Reaction Window                  | `js/game.js`        | `GRACE`                 |
+| Slide-out Forgiveness            | `js/game.js`        | `SLIDE`                 |
 | Chant Speed (Green Light length) | `js/game.js`        | `beginGreen()` (`rate`) |
 | Chant Melody & Lyrics            | `js/audio.js`       | `CHANT`                 |
 | Red Light Duration               | `js/game.js`        | `beginRed()`            |
