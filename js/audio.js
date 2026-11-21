@@ -273,6 +273,21 @@ export const Sound = {
     stopChant();
   },
 
+  // Gunshot: crack + boom + echo; for the player also ringing ears, a slow heartbeat and the body dropping
+  gunshot(far) {
+    if (!ctx) return;
+    const v = far ? 0.35 : 1;
+    noise(0.09, 1.0 * v, "highpass", 1800, 0.7, 0, null, 300);
+    osc("sine", 150, 38, 0.45, 0.95 * v);
+    noise(0.9, 0.3 * v, "lowpass", 900, 0.8, 0.05, null, 120);
+    osc("sine", 2400, 1000, 0.22, 0.08 * v, null, 0.14);
+    if (!far) {
+      osc("sine", 3100, 3000, 1.2, 0.05, null, 0.1);
+      osc("sine", 55, 40, 0.18, 0.7, null, 0.55);
+      osc("sine", 55, 40, 0.18, 0.55, null, 1.0);
+      osc("sine", 120, 40, 0.3, 0.6, null, 0.45);
+    }
+  },
   bump() {
     if (ctx) {
       osc("sine", 130, 45, 0.16, 0.5);

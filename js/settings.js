@@ -59,10 +59,12 @@ function read() {
   }
 }
 export const settings = Object.assign(
-  { preset: RECOMMENDED, volume: 0.7, muted: false },
+  { preset: RECOMMENDED, volume: 0.7, muted: false, tod: "day" },
   read(),
 );
 if (!PRESETS[settings.preset]) settings.preset = RECOMMENDED;
+if (!["day", "afternoon", "sunset"].includes(settings.tod))
+  settings.tod = "day";
 
 export function saveSettings() {
   try {

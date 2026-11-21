@@ -9,6 +9,61 @@ export const ARENA = {
   frontZ: 14,
 };
 
+// Time-of-day looks: sky gradient (top, middle, horizon), fog, ambient + sun light, and tints for the nature.
+export const TIMES = {
+  day: {
+    sky: ["#2f7fe0", "#7fb8f2", "#d6ecff"],
+    fog: 0xbfdcf5,
+    hemiSky: 0xcfe6ff,
+    hemiGround: 0x5d7a3b,
+    hemiI: 1.05,
+    sun: 0xfff0d2,
+    sunI: 2.4,
+    sunOff: [-30, 55, 35],
+    disc: false,
+    exposure: 1.12,
+    cloud: 0xffffff,
+    cloudEm: 0x9fb4cc,
+    ground: 0xffffff,
+    grass: 0xffffff,
+    hills: 0xffffff,
+  },
+  afternoon: {
+    sky: ["#3f78c8", "#f0b97a", "#ffe0b0"],
+    fog: 0xf2cfa0,
+    hemiSky: 0xffe0b8,
+    hemiGround: 0x6a7a3a,
+    hemiI: 1.0,
+    sun: 0xffcf8a,
+    sunI: 2.7,
+    sunOff: [-35, 38, 22],
+    disc: false,
+    exposure: 1.1,
+    cloud: 0xfff0e0,
+    cloudEm: 0xe0a878,
+    ground: 0xfff0d8,
+    grass: 0xfff0d8,
+    hills: 0xffe8c8,
+  },
+  sunset: {
+    sky: ["#2b2a6b", "#d9566e", "#ffb070"],
+    fog: 0xe58a6e,
+    hemiSky: 0xff9a80,
+    hemiGround: 0x5a4060,
+    hemiI: 1.0,
+    sun: 0xff7a3c,
+    sunI: 2.4,
+    sunOff: [-30, 30, -90],
+    disc: true,
+    exposure: 1.05,
+    cloud: 0xffb89a,
+    cloudEm: 0xff7a6a,
+    ground: 0xe9b59a,
+    grass: 0xe0a890,
+    hills: 0xb9806e,
+  },
+};
+
 const rnd = (a, b) => a + Math.random() * (b - a);
 const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
 
@@ -173,15 +228,18 @@ export function createEnvironment(scene) {
 
   // ---- Sky, fog, light ----
   scene.fog = new THREE.Fog(0xbfdcf5, 60, 300);
-  scene.background = tex(8, 256, (c, w, h) => {
-    const g = c.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, "#2f7fe0");
-    g.addColorStop(0.55, "#7fb8f2");
-    g.addColorStop(1, "#d6ecff");
-    c.fillStyle = g;
-    c.fillRect(0, 0, w, h);
-  });
-  scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x5d7a3b, 1.05));
+  const skyTex = (st) =>
+    tex(8, 256, (c, w, h) => {
+      const g = c.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, st[0]);
+      g.addColorStop(0.55, st[1]);
+      g.addColorStop(1, st[2]);
+      c.fillStyle = g;
+      c.fillRect(0, 0, w, h);
+    });
+  scene.background = skyTex(TIMES.day.sky);
+  const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x5d7a3b, 1.05);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff0d2, 2.4);
   sun.castShadow = true;
   Object.assign(sun.shadow.camera, {
@@ -195,6 +253,36 @@ export function createEnvironment(scene) {
   sun.shadow.bias = -0.0006;
   sun.shadow.normalBias = 0.04;
   scene.add(sun, sun.target);
+
+  // Visible sun disc (sunset only), kept far away in the sun's direction
+  let sunOff = TIMES.day.sunOff.slice(),
+    sunDir = [0, 1, 0];
+  const sc = document.createElement("canvas");
+  sc.width = sc.height = 128;
+  const sx = sc.getContext("2d"),
+    sg = sx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  sg.addColorStop(0, "rgba(255,255,255,1)");
+  sg.addColorStop(0.16, "rgba(255,238,190,1)");
+  sg.addColorStop(0.38, "rgba(255,170,90,0.55)");
+  sg.addColorStop(1, "rgba(255,120,60,0)");
+  sx.fillStyle = sg;
+  sx.fillRect(0, 0, 128, 128);
+  const sunDisc = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(sc),
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false,
+      fog: false,
+    }),
+  );
+  sunDisc.scale.set(80, 80, 1);
+  sunDisc.visible = false;
+  scene.add(sunDisc);
+  const tint = (m, base, t) => {
+    m.color.setHex(base);
+    m.color.multiply(new THREE.Color(t));
+  };
 
   // ---- Ground + track ----
   const grassTex = tex(
@@ -499,9 +587,37 @@ export function createEnvironment(scene) {
       cloudGroup.rotation.y += dt * 0.003;
       for (const c of cams)
         c.g.rotation.y = c.base + Math.sin(t * 0.6 + c.ph) * 0.7;
-      sun.position.set(fx - 30, 55, fz + 35);
+      sun.position.set(fx + sunOff[0], sunOff[1], fz + sunOff[2]);
+      if (sunDisc.visible)
+        sunDisc.position.set(
+          fx + sunDir[0] * 430,
+          sunDir[1] * 430,
+          fz + sunDir[2] * 430,
+        );
       sun.target.position.set(fx, 0, fz);
       sun.target.updateMatrixWorld();
+    },
+    applyTime(name) {
+      const T = TIMES[name] || TIMES.day;
+      if (scene.background && scene.background.dispose)
+        scene.background.dispose();
+      scene.background = skyTex(T.sky);
+      scene.fog.color.setHex(T.fog);
+      hemi.color.setHex(T.hemiSky);
+      hemi.groundColor.setHex(T.hemiGround);
+      hemi.intensity = T.hemiI;
+      sun.color.setHex(T.sun);
+      sun.intensity = T.sunI;
+      sunOff = T.sunOff.slice();
+      const l = Math.hypot(sunOff[0], sunOff[1], sunOff[2]);
+      sunDir = sunOff.map((v) => v / l);
+      sunDisc.visible = !!T.disc;
+      clouds.material.color.setHex(T.cloud);
+      clouds.material.emissive.setHex(T.cloudEm);
+      tint(ground.material, 0xffffff, T.ground);
+      tint(grass.material, 0x4f9a33, T.grass);
+      tint(hills.material, 0x6ea04a, T.hills);
+      return T;
     },
     applyPreset(p) {
       sun.castShadow = p.shadows;

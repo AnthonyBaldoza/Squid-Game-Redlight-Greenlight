@@ -15,6 +15,8 @@ Experience the classic Red Light, Green Light challenge in a 3D environment.
 - ⏱️ **Time Limit:** Reach the finish line within 70 seconds.
 - ⚠️ **Elimination:** Your character does NOT stop by itself. Let go of the controls when the doll turns. Moving (or jumping) after the 0.5-second reaction window results in elimination. Being shoved by others never counts.
 - 🤖 **AI Contestants:** Compete alongside approximately 24 AI contestants. You bump into them, and if one is eliminated right next to you, the falling body can shove or trip you (jump to dodge it).
+- 💥 **Dramatic Elimination:** A gunshot with tracer fire, a white-to-red flash, slow motion, and a hard cut to the doll staring at you before the game over screen.
+- 🌇 **Time of Day:** Choose DAY, AFTERNOON or SUNSET in Settings (different sky, fog, lighting, and a visible sun at sunset).
 - 🎬 **Cinematic Intro:** The first start from the main menu plays a camera flight with a title card (tap or press any key to skip). Retrying skips straight to the countdown.
 - 🏆 **Best Time:** Your best completion time is saved using browser `localStorage`.
 - 📤 **Share:** After winning or getting eliminated, tap SHARE to post a result card to Facebook (system share sheet on phones; on desktop the image is saved/copied and Facebook's share dialog opens).

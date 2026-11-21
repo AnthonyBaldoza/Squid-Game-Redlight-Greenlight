@@ -31,6 +31,8 @@ export class Game {
     this.phaseDur = 5;
     this.timeLeft = LIMIT;
     this.elapsed = 0;
+    this.timeScale = 1;
+    this.doomCut = false;
     this.bumpCd = 0;
     this.introT = 0;
     this.introBeat = 0;
@@ -50,6 +52,7 @@ export class Game {
     this.elapsed = 0;
     this.winShown = false;
     this.mode = "idle";
+    this.timeScale = 1;
   }
 
   toMenu() {
@@ -300,19 +303,18 @@ export class Game {
       reason: "MOVED DURING RED LIGHT",
     };
     this.player.fall();
-    Sound.eliminate(false);
-    UI.flash();
+    // Drama: gunshot, white-to-red flash, slow motion, and a hard cut to the doll staring at you
+    this.timeScale = 0.2;
+    this.doomCut = false;
+    Sound.gunshot(false);
+    UI.flash(true);
     UI.notify("ELIMINATED");
-    this.rig.setMode("dead");
-    this.rig.shake(0.6);
-    this.particles.burst(
-      this.player.pos.x,
-      1.2,
-      this.player.pos.z,
-      0xff3355,
-      30,
-      6,
-    );
+    this.rig.setMode("doll");
+    this.rig.shake(0.5);
+    const px = this.player.pos.x,
+      pz = this.player.pos.z;
+    this.particles.shoot(px >= 0 ? 15.5 : -15.5, 1.6, pz - 3, px, 1.2, pz);
+    this.particles.burst(px, 1.2, pz, 0xff3355, 40, 7);
   }
 
   timeUp() {
@@ -325,7 +327,8 @@ export class Game {
     UI.showOver("TIME'S UP. YOU DIDN'T REACH THE FINISH LINE.");
   }
 
-  update(dt, t) {
+  update(dt, t, rdt = dt) {
+    // dt may be slowed down (slow-mo), rdt is real time
     const p = this.player;
     switch (this.state) {
       case S.INTRO:
@@ -383,15 +386,25 @@ export class Game {
         if (this.tickClock(dt)) this.timeUp();
         else if (this.phaseT >= this.phaseDur) this.beginGreen();
         break;
-      case S.ELIMINATED:
+      case S.ELIMINATED: {
         p.update(dt, true);
-        this.endT += dt;
-        if (this.endT > 1.9) {
+        this.endT += rdt; // timeline runs in real time
+        if (!this.doomCut && this.endT > 1.0) {
+          this.doomCut = true;
+          this.rig.setMode("dead");
+        } // cut back to the fallen player
+        this.timeScale =
+          this.endT < 1.3
+            ? 0.2
+            : Math.min(1, 0.2 + ((this.endT - 1.3) / 0.7) * 0.8); // ease back to normal speed
+        if (this.endT > 2.7) {
           this.state = S.GAMEOVER;
+          this.timeScale = 1;
           Sound.gameOver();
           UI.showOver("YOU MOVED DURING RED LIGHT.");
         }
         break;
+      }
       case S.VICTORY:
         p.update(dt, true);
         this.endT += dt;

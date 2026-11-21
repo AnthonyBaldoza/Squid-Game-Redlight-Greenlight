@@ -49,7 +49,8 @@ const player = new Player(scene, canvas, {
   jump: $("jumpBtn"),
 });
 const contestants = new Contestants(scene, (c) => {
-  Sound.eliminate(Math.abs(c.z - player.pos.z) > 25);
+  Sound.gunshot(Math.abs(c.z - player.pos.z) > 25);
+  particles.shoot(c.x >= 0 ? 15.5 : -15.5, 1.6, c.z - 2, c.x, 1.1, c.z);
   particles.burst(c.x, 1.2, c.z, 0xff3355, 18, 4);
   game.onContestantDown(c);
 });
@@ -79,6 +80,14 @@ function applyPreset(name, persist = true) {
 }
 addEventListener("resize", applyRes);
 addEventListener("orientationchange", () => setTimeout(applyRes, 150));
+
+function applyTime(name, persist = true) {
+  settings.tod = name;
+  if (persist) saveSettings();
+  const T = env.applyTime(name);
+  renderer.toneMappingExposure = T.exposure;
+  UI.syncTime(name);
+}
 
 // Adaptive resolution: lower the render scale when FPS drops, restore it when stable.
 let accT = 0,
@@ -185,6 +194,7 @@ UI.init({
   },
   menu: () => game.toMenu(),
   preset: applyPreset,
+  time: (name) => applyTime(name),
   volume: (v) => {
     settings.volume = v;
     saveSettings();
@@ -195,6 +205,7 @@ UI.init({
 Sound.setVolume(settings.volume);
 Sound.setMuted(settings.muted);
 applyPreset(settings.preset);
+applyTime(settings.tod, false);
 game.toMenu();
 
 // Skip the cinematic intro with any click / tap / key
@@ -241,12 +252,13 @@ function frame(now) {
   if (dt <= 0) return;
   if (dt > 0.05) dt = 0.05;
   if (!game.paused) {
-    t += dt;
-    game.update(dt, t);
-    doll.update(dt, t);
-    particles.update(dt);
-    rig.update(dt);
-    env.update(dt, t, player.pos.x, player.pos.z);
+    const sdt = dt * game.timeScale; // slow motion on elimination
+    t += sdt;
+    game.update(sdt, t, dt);
+    doll.update(sdt, t);
+    particles.update(sdt);
+    rig.update(sdt);
+    env.update(sdt, t, player.pos.x, player.pos.z);
   }
   renderer.render(scene, camera);
   adapt(dt);

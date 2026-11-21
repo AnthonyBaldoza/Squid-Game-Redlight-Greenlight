@@ -436,7 +436,8 @@ export class CameraRig {
   setMode(m) {
     this.mode = m;
     this.modeT = 0;
-  }
+    this.snap = m === "doll" || m === "dead";
+  } // doll / dead are hard cuts
   shake(a) {
     this.shakeA = Math.max(this.shakeA, a);
   }
@@ -543,6 +544,12 @@ export class CameraRig {
       const a = Math.sin(this.modeT * 0.6) * 0.8;
       this.des.set(p.pos.x + Math.sin(a) * 6, 2.4, p.pos.z - 7);
       this.lt.set(p.pos.x, 1.7, p.pos.z);
+    } else if (this.mode === "doll") {
+      // close-up of the doll staring at you (in the red state her face points toward +Z)
+      this.des.set(6.5, 12.6, Math.min(-99 + this.modeT * 1.2, -96));
+      this.lt.set(4, 13.4, -113);
+      fovT = cam.aspect < 1 ? 46 : 33;
+      k = 1;
     } else {
       // dead
       this.des.set(
@@ -558,8 +565,15 @@ export class CameraRig {
     this.des.z = clamp(this.des.z, -124, 13.4);
     this.des.y = Math.max(0.8, this.des.y);
 
-    this.pos.lerp(this.des, k);
-    this.look.lerp(this.lt, Math.min(1, k * 1.3));
+    if (this.snap) {
+      this.pos.copy(this.des);
+      this.look.copy(this.lt);
+      this.fov = fovT;
+      this.snap = false;
+    } else {
+      this.pos.lerp(this.des, k);
+      this.look.lerp(this.lt, Math.min(1, k * 1.3));
+    }
     this.shakeA *= Math.exp(-dt * 5);
     cam.position.set(
       this.pos.x + (Math.random() - 0.5) * this.shakeA,

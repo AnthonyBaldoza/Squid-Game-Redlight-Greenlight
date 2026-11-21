@@ -999,3 +999,31 @@ input[type="range"] {
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 12px;
 }
+
+/* Elimination flash (muzzle white -> red) */
+#flash.hard {
+  animation: flashHard 1.3s ease-out;
+}
+@keyframes flashHard {
+  0% {
+    background: #fff;
+    opacity: 0.95;
+  }
+  8% {
+    background: #ff1030;
+    opacity: 0.9;
+  }
+  100% {
+    background: #ff1030;
+    opacity: 0;
+  }
+}
+
+/* Time-of-day buttons */
+.row.wrap {
+  flex-wrap: wrap;
+}
+.seg.sm button {
+  font-size: 16px;
+  padding: 6px 10px;
+}

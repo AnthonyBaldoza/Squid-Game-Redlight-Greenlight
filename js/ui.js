@@ -33,6 +33,9 @@ export const UI = {
     document.querySelectorAll("[data-p]").forEach((b) => {
       b.onclick = () => h.preset(b.dataset.p);
     });
+    document.querySelectorAll("[data-t]").forEach((b) => {
+      b.onclick = () => h.time(b.dataset.t);
+    });
     $("vol").oninput = (e) => h.volume(e.target.value / 100);
     $("muteSet").onclick = h.mute;
     $("muteBtn").onclick = h.mute;
@@ -53,6 +56,7 @@ export const UI = {
     $("recNote").textContent =
       "Recommended for this device: " + PRESETS[RECOMMENDED].label;
     UI.syncPreset(settings.preset);
+    UI.syncTime(settings.tod);
     UI.syncAudio();
     UI.menuBest();
   },
@@ -131,6 +135,11 @@ export const UI = {
     $("menuBest").textContent = b == null ? "" : "BEST TIME  " + fmt(b);
   },
 
+  syncTime(name) {
+    document
+      .querySelectorAll("[data-t]")
+      .forEach((b) => b.classList.toggle("on", b.dataset.t === name));
+  },
   syncPreset(name) {
     document
       .querySelectorAll("[data-p]")
@@ -204,11 +213,11 @@ export const UI = {
     el.style.animation = "";
     noteTimer = setTimeout(() => el.classList.add("hidden"), 1800);
   },
-  flash() {
+  flash(hard) {
     const f = $("flash");
-    f.classList.remove("on");
+    f.classList.remove("on", "hard");
     void f.offsetWidth;
-    f.classList.add("on");
+    f.classList.add(hard ? "hard" : "on");
   },
 
   showOver(reason) {
