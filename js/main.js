@@ -7,6 +7,7 @@ import { Particles } from "./particles.js";
 import { Game } from "./game.js";
 import { UI } from "./ui.js";
 import { Sound } from "./audio.js";
+import { shareResult } from "./share.js";
 import {
   settings,
   saveSettings,
@@ -50,6 +51,7 @@ const player = new Player(scene, canvas, {
 const contestants = new Contestants(scene, (c) => {
   Sound.eliminate(Math.abs(c.z - player.pos.z) > 25);
   particles.burst(c.x, 1.2, c.z, 0xff3355, 18, 4);
+  game.onContestantDown(c);
 });
 const rig = new CameraRig(camera, player);
 const game = new Game({ player, contestants, doll, rig, particles });
@@ -118,6 +120,16 @@ function adapt(dt) {
   }
 }
 
+// Grab the current frame (rendered right now so the WebGL buffer is still valid) for the share card
+function frameShot() {
+  renderer.render(scene, camera);
+  const c = document.createElement("canvas");
+  c.width = canvas.width;
+  c.height = canvas.height;
+  c.getContext("2d").drawImage(canvas, 0, 0);
+  return c;
+}
+
 // ---- UI wiring ----
 function goFullscreen() {
   try {
@@ -136,7 +148,7 @@ function goFullscreen() {
 function checkPortrait() {
   if (touchy() && innerWidth <= 820 && innerHeight > innerWidth) game.pause();
 }
-function startGame() {
+function startGame(quick) {
   Sound.init();
   if (touchy()) goFullscreen();
   else if (canvas.requestPointerLock) {
@@ -146,7 +158,7 @@ function startGame() {
       /* ignore */
     }
   }
-  game.start();
+  game.start(quick === true);
   player.releaseTouch();
   checkPortrait();
 }
@@ -157,7 +169,9 @@ function toggleMute() {
   UI.syncAudio();
 }
 UI.init({
-  play: startGame,
+  play: () => startGame(false),
+  retry: () => startGame(true),
+  share: () => shareResult(frameShot(), game.result, (m) => UI.toast(m)),
   pause: () => game.pause(),
   resume: () => {
     game.resume();
@@ -182,6 +196,12 @@ Sound.setVolume(settings.volume);
 Sound.setMuted(settings.muted);
 applyPreset(settings.preset);
 game.toMenu();
+
+// Skip the cinematic intro with any click / tap / key
+addEventListener("pointerdown", () => game.skipIntro(), true);
+addEventListener("keydown", (e) => {
+  if (e.code !== "KeyP" && e.code !== "Escape") game.skipIntro();
+});
 
 // Pause: P or Esc, auto-pause when the mouse lock is released or the tab is hidden
 addEventListener("keydown", (e) => {

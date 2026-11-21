@@ -58,10 +58,18 @@ button {
   );
 }
 #edge.edge-green {
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(34, 212, 106, 0.4) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(34, 212, 106, 0.4) 100%
+  );
 }
 #edge.edge-red {
-  background: radial-gradient(ellipse at center, transparent 50%, rgba(255, 43, 58, 0.55) 100%);
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(255, 43, 58, 0.55) 100%
+  );
 }
 #flash {
   background: #ff1030;
@@ -654,7 +662,9 @@ input[type="range"] {
 }
 #jumpBtn {
   position: absolute;
-  right: calc(env(safe-area-inset-right, 0px) + 6vmin + min(22vmin, 124px) + 14px);
+  right: calc(
+    env(safe-area-inset-right, 0px) + 6vmin + min(22vmin, 124px) + 14px
+  );
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12vmin);
   width: 18vmin;
   height: 18vmin;
@@ -838,7 +848,10 @@ input[type="range"] {
 }
 #chant span {
   opacity: 0.35;
-  transition: opacity 0.08s, color 0.08s, transform 0.08s;
+  transition:
+    opacity 0.08s,
+    color 0.08s,
+    transform 0.08s;
 }
 #chant span.sp {
   margin-right: 10px;
@@ -863,4 +876,126 @@ input[type="range"] {
     top: calc(env(safe-area-inset-top, 0px) + 46px);
     font-size: 16px;
   }
+}
+
+/* Cinematic intro */
+#intro {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+#intro .bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 12vh;
+  background: #000;
+}
+#intro .top {
+  top: 0;
+  animation: barTop 0.9s ease-out both;
+}
+#intro .bot {
+  bottom: 0;
+  animation: barBot 0.9s ease-out both;
+}
+@keyframes barTop {
+  from {
+    transform: translateY(-100%);
+  }
+}
+@keyframes barBot {
+  from {
+    transform: translateY(100%);
+  }
+}
+#introTitle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.6s;
+}
+#introTitle small {
+  display: block;
+  margin-top: 14px;
+  font-size: clamp(13px, 2vw, 20px);
+  letter-spacing: 0.4em;
+  opacity: 0.85;
+}
+#intro.title #introTitle {
+  opacity: 1;
+}
+#introPlayer {
+  position: absolute;
+  left: 6vw;
+  bottom: calc(12vh + 22px);
+  padding-left: 14px;
+  border-left: 4px solid var(--pink);
+  opacity: 0;
+  transform: translateX(-24px);
+  transition:
+    opacity 0.5s,
+    transform 0.5s;
+}
+#introPlayer small {
+  display: block;
+  font-size: 14px;
+  letter-spacing: 0.3em;
+  opacity: 0.8;
+}
+#introPlayer b {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: clamp(48px, 9vw, 96px);
+  line-height: 1;
+}
+#intro.player #introPlayer {
+  opacity: 1;
+  transform: none;
+}
+#skip {
+  position: absolute;
+  right: 4vw;
+  bottom: calc(12vh + 14px);
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  opacity: 0.75;
+}
+@media (max-height: 480px) {
+  #introTitle .title {
+    font-size: 54px;
+  }
+  #introPlayer b {
+    font-size: 48px;
+  }
+}
+
+/* Share button + toast */
+.btn.fb {
+  background: #1877f2;
+  box-shadow:
+    0 6px 0 rgba(8, 50, 120, 0.85),
+    0 0 30px rgba(24, 119, 242, 0.35);
+}
+.btn.fb:active {
+  box-shadow: 0 2px 0 rgba(8, 50, 120, 0.85);
+}
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: min(92vw, 520px);
+  padding: 10px 18px;
+  text-align: center;
+  font-size: 16px;
+  background: rgba(10, 10, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 12px;
 }

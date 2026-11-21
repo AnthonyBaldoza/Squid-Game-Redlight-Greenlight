@@ -31,6 +31,9 @@ const BASE = 0.85; // same scale as the player model
 const COLS = 8,
   ROWS = 4;
 const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const PR = 0.8; // player <-> contestant contact distance
+const CR = 0.75; // contestant <-> contestant contact distance
 
 // Palette: skin / hair are WHITE here because they are tinted per instance
 const PAL = {
@@ -279,7 +282,63 @@ export class Contestants {
       c.lean += ((c.moving ? 0.12 : 0) - c.lean) * kl;
       if (!c.alive && c.fall < HALF) c.fall = Math.min(HALF, c.fall + dt * 4.5);
     }
+    this.separate();
     this.write(camX, camZ, false);
+  }
+
+  // Crowd: standing / running contestants gently push each other apart instead of overlapping
+  separate() {
+    const l = this.list,
+      n = l.length;
+    for (let i = 0; i < n; i++) {
+      const a = l[i];
+      if (!a.alive || a.finished) continue;
+      for (let j = i + 1; j < n; j++) {
+        const b = l[j];
+        if (!b.alive || b.finished) continue;
+        const dx = b.x - a.x,
+          dz = b.z - a.z,
+          d2 = dx * dx + dz * dz;
+        if (d2 >= CR * CR) continue;
+        const d = Math.sqrt(d2) || 0.001,
+          ov = (CR - d) * 0.5,
+          nx = d2 > 1e-6 ? dx / d : 1,
+          nz = d2 > 1e-6 ? dz / d : 0;
+        a.x = clamp(a.x - nx * ov, -12.5, 12.5);
+        b.x = clamp(b.x + nx * ov, -12.5, 12.5);
+        a.z -= nz * ov * 0.3;
+        b.z += nz * ov * 0.3;
+      }
+    }
+  }
+
+  // Player bumps into living contestants. The player gets pushed more than the contestant.
+  // Returns how hard the hardest hit was (0 = no contact).
+  collidePlayer(p) {
+    let hit = 0;
+    for (const c of this.list) {
+      if (!c.alive) continue;
+      const dx = p.pos.x - c.x,
+        dz = p.pos.z - c.z,
+        d2 = dx * dx + dz * dz;
+      if (d2 >= PR * PR || d2 < 1e-6) continue;
+      const d = Math.sqrt(d2),
+        ov = PR - d,
+        nx = dx / d,
+        nz = dz / d;
+      p.pos.x += nx * ov * 0.65;
+      p.pos.z += nz * ov * 0.65;
+      c.x = clamp(c.x - nx * ov * 0.35, -12.5, 12.5);
+      c.z -= nz * ov * 0.35;
+      const vn = p.vel.x * nx + p.vel.z * nz;
+      if (vn < 0) {
+        p.vel.x -= vn * nx * 0.8;
+        p.vel.z -= vn * nz * 0.8;
+        hit = Math.max(hit, -vn);
+      } else hit = Math.max(hit, 0.01);
+    }
+    if (hit > 0) p.clampPos();
+    return hit;
   }
 
   // part transform relative to the body root P, written into an instance slot

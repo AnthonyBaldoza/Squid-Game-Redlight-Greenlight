@@ -129,12 +129,40 @@ export class Player {
     this.vy = 0;
     this.grounded = true;
     this.jumpBuf = 0;
+    this.knock = { x: 0, z: 0 };
+    this.stunT = 0;
+    this.stagger = 0;
+    this.jumpCount = 0;
     this.group.position.copy(this.pos);
     this.group.rotation.set(0, 0, 0);
   }
 
   fall() {
     this.down = true;
+  }
+
+  // Shoved by a collision / falling body. Applied outside update(), so it never counts as "movement" on Red Light.
+  bump(nx, nz, power, stun = 0) {
+    this.knock.x += nx * power;
+    this.knock.z += nz * power;
+    if (stun > this.stunT) this.stunT = stun;
+    this.stagger = clamp(nx, -1, 1) * (stun > 0 ? 1.4 : 0.7);
+  }
+  applyKnock(dt) {
+    const k = this.knock;
+    if (Math.abs(k.x) + Math.abs(k.z) > 0.05) {
+      this.pos.x += k.x * dt;
+      this.pos.z += k.z * dt;
+      const d = Math.exp(-dt * 5);
+      k.x *= d;
+      k.z *= d;
+    } else k.x = k.z = 0;
+    this.stagger *= Math.exp(-dt * 4);
+    this.clampPos();
+  }
+  clampPos() {
+    this.pos.x = clamp(this.pos.x, -(ARENA.halfW - 2), ARENA.halfW - 2);
+    this.pos.z = clamp(this.pos.z, ARENA.finishZ - 6, 9);
   }
   speedFrac() {
     return Math.min(1, Math.hypot(this.vel.x, this.vel.z) / 8.2);
@@ -273,6 +301,10 @@ export class Player {
 
   // locked = true -> input ignored and the player brakes hard (Red Light / countdown / end screens)
   update(dt, locked) {
+    if (this.stunT > 0) {
+      this.stunT -= dt;
+      locked = true;
+    } // stumbling: no control for a moment
     const px = this.pos.x,
       pz = this.pos.z,
       k = this.keys;
@@ -331,6 +363,7 @@ export class Player {
       this.vy = 7.2;
       this.grounded = false;
       this.jumpBuf = 0;
+      this.jumpCount++;
       Sound.jump();
     }
     if (!this.grounded) {
@@ -370,7 +403,11 @@ export class Player {
           : 0),
       this.pos.z,
     );
-    this.group.rotation.set(-this.fallA, this.heading, 0);
+    this.group.rotation.set(
+      -this.fallA + clamp(this.stunT / 0.3, 0, 1) * 0.4,
+      this.heading,
+      this.stagger * 0.3,
+    );
     this.marker.visible = !this.down;
     this.marker.position.set(
       0,
@@ -394,6 +431,7 @@ export class CameraRig {
     this.look = new THREE.Vector3(4, 7, -113);
     this.des = new THREE.Vector3();
     this.lt = new THREE.Vector3();
+    this.fp = new THREE.Vector3();
   }
   setMode(m) {
     this.mode = m;
@@ -449,6 +487,48 @@ export class CameraRig {
       );
       k = 1;
       if (this.modeT >= 3) this.setMode("follow");
+    } else if (this.mode === "cinema") {
+      // Shot 1: orbit the doll. Shot 2: long pull-back flight down the track. Shot 3: hold behind the player.
+      const T1 = 2.8,
+        T2 = 6.6,
+        m = this.modeT,
+        ease = (u) => u * u * (3 - 2 * u);
+      const orbit = (e) => {
+        const a = 0.2 + e,
+          R = 16 + 3 * e;
+        return [4 + R * Math.cos(a), 7 + 4 * e, -113 + R * Math.sin(a)];
+      };
+      const fl = [
+        p.pos.x - Math.sin(p.yaw) * 3,
+        1.9,
+        p.pos.z - Math.cos(p.yaw) * 3,
+      ];
+      this.followPos(this.fp);
+      if (m < T1) {
+        const e = ease(m / T1),
+          o = orbit(e);
+        this.des.set(o[0], o[1], o[2]);
+        this.lt.set(4, 13 - 4 * e, -113 + 8 * e);
+      } else if (m < T2) {
+        const e = ease((m - T1) / (T2 - T1)),
+          s1 = orbit(1),
+          sw = Math.sin(e * Math.PI);
+        this.des.set(
+          s1[0] + (this.fp.x - s1[0]) * e - sw * 8,
+          s1[1] + (this.fp.y - s1[1]) * e + sw * 2,
+          s1[2] + (this.fp.z - s1[2]) * e,
+        );
+        this.lt.set(
+          4 + (fl[0] - 4) * e,
+          9 + (fl[1] - 9) * e,
+          -105 + (fl[2] + 105) * e,
+        );
+      } else {
+        this.des.copy(this.fp);
+        this.lt.set(fl[0], fl[1], fl[2]);
+      }
+      fovT *= 0.72 + 0.28 * ease(Math.min(1, m / T2));
+      k = 1;
     } else if (this.mode === "follow") {
       this.followPos(this.des);
       this.des.y += Math.sin(p.phase * 2) * 0.05 * p.speedFrac();
@@ -457,7 +537,7 @@ export class CameraRig {
         1.9 + p.y * 0.6,
         p.pos.z - Math.cos(p.yaw) * 3,
       );
-      k = 1 - Math.exp(-dt * 9);
+      k = 1 - Math.exp(-dt * (this.modeT < 0.9 ? 5 : 9)); // gentle settle after the cinematic / skip
       fovT += 6 * p.speedFrac();
     } else if (this.mode === "victory") {
       const a = Math.sin(this.modeT * 0.6) * 0.8;

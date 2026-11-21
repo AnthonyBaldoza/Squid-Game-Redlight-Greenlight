@@ -68,10 +68,27 @@
       </div>
     </div>
 
-    <div id="rotate"><div>ROTATE YOUR PHONE<small>Play in landscape mode</small></div></div>
+    <div id="rotate">
+      <div>ROTATE YOUR PHONE<small>Play in landscape mode</small></div>
+    </div>
 
     <div id="cd" class="hidden"></div>
     <div id="notice" class="hidden"></div>
+
+    <div id="toast" class="hidden"></div>
+
+    <!-- Cinematic intro -->
+    <div id="intro" class="hidden">
+      <i class="bar top"></i><i class="bar bot"></i>
+      <div id="introTitle">
+        <h1 class="title">
+          <span class="r">RED LIGHT</span><span class="g">GREEN LIGHT</span>
+        </h1>
+        <small>SURVIVE THE GAME</small>
+      </div>
+      <div id="introPlayer"><small>CONTESTANT</small><b>456</b></div>
+      <div id="skip">TAP OR PRESS ANY KEY TO SKIP</div>
+    </div>
 
     <!-- Touch controls -->
     <div id="touch" class="hidden">
@@ -107,11 +124,14 @@
         <h2>HOW TO PLAY</h2>
         <ul>
           <li>
-            <b class="gc">Green light:</b> run toward the finish line while the doll sings “Mu-gung-hwa kkot-i pi-eot-seum-ni-da”. She turns the moment the song ends!
+            <b class="gc">Green light:</b> run toward the finish line while the
+            doll sings “Mu-gung-hwa kkot-i pi-eot-seum-ni-da”. She turns the
+            moment the song ends!
           </li>
           <li>
             <b class="rc">Red light:</b> the doll turns and her eyes glow. Stop
-            immediately. Any movement after a short reaction window eliminates
+            immediately: let go of the controls yourself, you are not stopped
+            automatically. Any movement after a short reaction window eliminates
             you.
           </li>
           <li>
@@ -121,9 +141,10 @@
         </ul>
         <h3 id="howKeys">Controls</h3>
         <p class="keys">
-          Desktop: WASD / Arrow keys to move, Shift to sprint, Space to jump, mouse to look
-          (click the game to capture the mouse).<br />Mobile: left joystick to
-          move, hold SPRINT to run, tap JUMP to jump, drag the right side to look around.
+          Desktop: WASD / Arrow keys to move, Shift to sprint, Space to jump,
+          mouse to look (click the game to capture the mouse).<br />Mobile: left
+          joystick to move, hold SPRINT to run, tap JUMP to jump, drag the right
+          side to look around.
         </p>
         <button class="btn" id="howBack">BACK</button>
       </div>
@@ -171,6 +192,7 @@
       <p id="overReason" class="reason"></p>
       <div class="menu-btns">
         <button class="btn" id="overRestart">TRY AGAIN</button>
+        <button class="btn fb" id="overShare">SHARE</button>
         <button class="btn alt" id="overMenu">MAIN MENU</button>
       </div>
     </div>
@@ -191,6 +213,7 @@
       <p id="winNew" class="reason hidden">New personal best!</p>
       <div class="menu-btns">
         <button class="btn" id="winRestart">PLAY AGAIN</button>
+        <button class="btn fb" id="winShare">SHARE</button>
         <button class="btn alt" id="winMenu">MAIN MENU</button>
       </div>
     </div>
