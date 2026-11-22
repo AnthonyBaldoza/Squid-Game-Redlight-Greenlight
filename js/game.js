@@ -3,6 +3,7 @@ import { UI } from "./ui.js";
 import { ARENA } from "./environment.js";
 import { getBest, setBest } from "./settings.js";
 import { Net, slotX, slotIdx } from "../net.js";
+import { submitScore } from "./leaderboard.js";
 
 export const S = {
   MENU: "MENU",
@@ -526,6 +527,7 @@ export class Game {
           this.winShown = true;
           const w = this.winInfo;
           UI.showVictory(w.time, w.best, w.isNew, this.online ? Net.rank : 0);
+          submitScore(w.time);
         }
         break;
       default:
