@@ -2,6 +2,7 @@ import { Sound } from "./audio.js";
 import { UI } from "./ui.js";
 import { ARENA } from "./environment.js";
 import { getBest, setBest } from "./settings.js";
+import { Net, slotX, slotIdx } from "../net.js";
 
 export const S = {
   MENU: "MENU",
@@ -43,6 +44,9 @@ export class Game {
     this.endT = 0;
     this.winInfo = null;
     this.winShown = false;
+    this.online = false; // playing a room round (see net.js)
+    this.kind = "green"; // last phase started: 'green' | 'red'
+    this.ref = null; // online host that is already out: keeps the rounds going for everybody else
   }
 
   resetWorld() {
@@ -59,6 +63,8 @@ export class Game {
 
   toMenu() {
     this.paused = false;
+    this.online = false;
+    this.ref = null;
     Sound.resume();
     Sound.musicStop();
     this.resetWorld();
@@ -73,6 +79,8 @@ export class Game {
   // quick = true for retries (short camera swoop); false = full cinematic intro with title card
   start(quick) {
     this.paused = false;
+    this.online = false;
+    this.ref = null;
     Sound.resume(); // e.g. RESTART from the pause menu: audio was held suspended
     Sound.musicStop();
     this.resetWorld();
@@ -91,6 +99,79 @@ export class Game {
     UI.intro(true);
     this.rig.setMode("cinema");
     Sound.introSting();
+  }
+
+  // Online round: no cinematic, everybody gets the quick countdown. Each real player has their own lane on the
+  // start line; the AI contestants fill every seat that no real player took.
+  startOnline(msg) {
+    this.paused = false;
+    this.online = true;
+    this.ref = null;
+    Sound.resume();
+    Sound.musicStop();
+    this.resetWorld();
+    this.player.active = true;
+    this.greens = 0;
+    const me = Net.slot;
+    this.player.pos.x = slotX(me);
+    this.contestants.configureOnline(
+      slotIdx(me),
+      (msg.players || [])
+        .filter((p) => p.slot !== me)
+        .map((p) => ({ idx: slotIdx(p.slot), x: slotX(p.slot) })),
+    );
+    this.beginCountdown(true);
+  }
+
+  // Clients follow the host's phase announcements instead of running their own timers
+  followHost() {
+    return this.online && Net.role === "client";
+  }
+
+  netPhase(m) {
+    const s = this.state;
+    if (m.t === "g" && (s === S.COUNTDOWN || s === S.RED)) {
+      if (s === S.COUNTDOWN) {
+        UI.countdown("GO!");
+        Sound.countdown(0);
+      }
+      this.beginGreen(m.rate);
+    } else if (m.t === "r" && s === S.GREEN) this.beginRed(m.dur);
+  }
+
+  netMsg(m) {
+    if (!this.online) return;
+    if (m.t === "g" || m.t === "r") return this.netPhase(m);
+    if (m.t === "s") {
+      for (const k in m.p) {
+        const s = +k;
+        if (s !== Net.slot)
+          this.contestants.netPos(slotIdx(s), m.p[k][0], m.p[k][1]);
+      }
+    } else if (m.t === "e" && m.slot !== Net.slot)
+      this.contestants.netEvent(slotIdx(m.slot), m.k);
+  }
+
+  // Online host that is eliminated / finished / out of time: keep Green and Red going for everyone else
+  refStep(dt) {
+    if (!this.ref)
+      this.ref = { kind: this.kind, t: this.phaseT, dur: this.phaseDur };
+    const r = this.ref;
+    r.t += dt;
+    if (r.t < r.dur) return;
+    r.t = 0;
+    if (r.kind === "green") {
+      r.kind = "red";
+      r.dur = rand(2, 5);
+      Net.phase({ t: "r", dur: r.dur });
+      this.doll.setState("red");
+    } else {
+      r.kind = "green";
+      const rate = rand(0.7, 1.45);
+      r.dur = Sound.chantLength(rate);
+      Net.phase({ t: "g", rate });
+      this.doll.setState("green");
+    }
   }
 
   metersNow() {
@@ -183,13 +264,21 @@ export class Game {
     }
   }
 
-  beginGreen() {
+  beginGreen(forced) {
     this.state = S.GREEN;
     this.mode = "green";
+    this.kind = "green";
     this.phaseT = 0;
     // The doll sings "Mu-gung-hwa kkot-i pi-eot-seum-ni-da". Green lasts exactly as long as the song;
     // she gets faster as the game goes on (first round is calm).
-    const rate = this.greens++ === 0 ? 0.85 : rand(0.7, 1.45);
+    const rate =
+      forced !== undefined
+        ? forced
+        : this.greens === 0
+          ? 0.85
+          : rand(0.7, 1.45);
+    this.greens++;
+    if (this.online && Net.role === "host") Net.phase({ t: "g", rate });
     this.chant = Sound.chant(rate);
     this.chantIdx = -1;
     this.dollTurning = false;
@@ -202,11 +291,14 @@ export class Game {
     Sound.musicStart();
   }
 
-  beginRed() {
+  beginRed(forced) {
     this.state = S.RED;
     this.mode = "red";
+    this.kind = "red";
     this.phaseT = 0;
-    this.phaseDur = rand(2, 5);
+    this.phaseDur = forced !== undefined ? forced : rand(2, 5);
+    if (this.online && Net.role === "host")
+      Net.phase({ t: "r", dur: this.phaseDur });
     if (!this.dollTurning) {
       this.doll.setState("red");
       Sound.dollTurn();
@@ -222,6 +314,7 @@ export class Game {
   }
 
   canPause() {
+    if (this.online) return false; // the other players cannot wait for you
     return (
       this.state === S.INTRO ||
       this.state === S.COUNTDOWN ||
@@ -278,6 +371,7 @@ export class Game {
       best = getBest(),
       isNew = best === null || time < best;
     if (isNew) setBest(time);
+    if (this.online) Net.sendEvent("f", { time });
     this.winInfo = { time, best: isNew ? time : best, isNew };
     this.result = {
       won: true,
@@ -309,6 +403,7 @@ export class Game {
       pz = this.player.pos.z,
       dir = px >= 0 ? -1 : 1; // the guard is on the player's side of the track, the bullet travels toward the middle
     this.player.fall(dir);
+    if (this.online) Net.sendEvent("d");
     // Drama, in beats (real time, see update()): 0 hit = gunshot + flash + slow motion + punch-in on the player,
     // 0.55 cut to the doll staring at you, 1.3 cut to the fallen player with the red vignette, 3.3 game over screen
     this.timeScale = 0.2;
@@ -326,6 +421,7 @@ export class Game {
     this.state = S.GAMEOVER;
     this.mode = "idle";
     this.result = { won: false, meters: this.metersNow(), reason: "TIME'S UP" };
+    if (this.online) Net.sendEvent("x");
     Sound.musicStop();
     Sound.gameOver();
     UI.flash();
@@ -352,9 +448,13 @@ export class Game {
           Sound.countdown(n);
         }
         if (this.cd <= 0) {
-          UI.countdown("GO!");
-          Sound.countdown(0);
-          this.beginGreen();
+          if (this.followHost())
+            this.cd = 0; // wait for the host's green
+          else {
+            UI.countdown("GO!");
+            Sound.countdown(0);
+            this.beginGreen();
+          }
         }
         break;
       }
@@ -364,7 +464,8 @@ export class Game {
         this.singAlong();
         if (p.finished) this.win();
         else if (this.tickClock(dt)) this.timeUp();
-        else if (this.phaseT >= this.phaseDur) this.beginRed();
+        else if (this.phaseT >= this.phaseDur && !this.followHost())
+          this.beginRed();
         break;
       case S.RED:
         this.phaseT += dt;
@@ -389,7 +490,8 @@ export class Game {
           UI.notify("STOP!");
         }
         if (this.tickClock(dt)) this.timeUp();
-        else if (this.phaseT >= this.phaseDur) this.beginGreen();
+        else if (this.phaseT >= this.phaseDur && !this.followHost())
+          this.beginGreen();
         break;
       case S.ELIMINATED: {
         p.update(dt, true);
@@ -423,12 +525,21 @@ export class Game {
         if (this.endT > 2.4 && !this.winShown) {
           this.winShown = true;
           const w = this.winInfo;
-          UI.showVictory(w.time, w.best, w.isNew);
+          UI.showVictory(w.time, w.best, w.isNew, this.online ? Net.rank : 0);
         }
         break;
       default:
         p.update(dt, true);
     }
+
+    if (
+      this.online &&
+      Net.role === "host" &&
+      (this.state === S.ELIMINATED ||
+        this.state === S.GAMEOVER ||
+        this.state === S.VICTORY)
+    )
+      this.refStep(rdt);
 
     this.resolveCollisions(dt);
     this.contestants.update(

@@ -275,6 +275,12 @@ export const Sound = {
   chantStop() {
     stopChant();
   },
+  // Length of the song at this speed without playing it (the online host keeps the rounds going after it is out)
+  chantLength(rate = 1) {
+    let acc = 0;
+    for (const s of CHANT) acc += s.d / rate;
+    return acc;
+  },
 
   // Gunshot: crack + boom + echo; for the player also ringing ears, a slow heartbeat and the body dropping
   gunshot(far) {

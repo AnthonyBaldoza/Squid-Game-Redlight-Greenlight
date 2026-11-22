@@ -152,11 +152,15 @@ export class Contestants {
     ];
 
     this.list = spots.map((s, i) => {
-      const b = rnd(0.86, 1.06);
+      const b = rnd(0.86, 1.06),
+        sx = s[0] + rnd(-0.25, 0.25),
+        sz = s[1] + rnd(-0.2, 0.2);
       return {
         i,
-        sx: s[0] + rnd(-0.25, 0.25),
-        sz: s[1] + rnd(-0.2, 0.2),
+        sx,
+        sz,
+        osx: sx, // original spawn: online mode moves sx / sz for remote players
+        osz: sz,
         speed: rnd(3.2, 6.2),
         fr: rnd(1, 2.5),
         ph: rnd(0, 6),
@@ -187,6 +191,10 @@ export class Contestants {
     this.alive = this.n;
     this.acc = 0;
     for (const c of this.list) {
+      c.sx = c.osx;
+      c.sz = c.osz;
+      c.remote = false; // driven by a real player over the network (online mode)
+      c.hidden = false; // my own seat: the local player model stands in for it
       c.x = c.sx;
       c.z = c.sz;
       c.alive = true;
@@ -213,6 +221,61 @@ export class Contestants {
     }
     this.flushColors();
     this.write(0, 0, true);
+  }
+
+  // Online: `mine` = list index of my own seat (hidden, the player model replaces it),
+  // `others` = [{ idx, x }] seats taken by other real players. The rest stay AI fillers.
+  configureOnline(mine, others) {
+    const me = this.list[mine];
+    if (me) {
+      me.hidden = true;
+      me.alive = false;
+      me.fall = HALF;
+      this.alive--;
+    }
+    for (const o of others) {
+      const c = this.list[o.idx];
+      if (!c) continue;
+      c.remote = true;
+      c.sx = c.x = c.tx = o.x;
+      c.sz = c.z = c.tz = 3.4;
+      c.moving = false;
+    }
+    this.write(0, 0, true);
+  }
+
+  netPos(i, x, z) {
+    const c = this.list[i];
+    if (c && c.remote) {
+      c.tx = x;
+      c.tz = z;
+    }
+  }
+
+  // k: 'd' shot, 'f' finished, 'x' out of time, 'gone' left the room
+  netEvent(i, k) {
+    const c = this.list[i];
+    if (!c || !c.remote) return;
+    if (k === "d") {
+      if (c.alive) this.kill(c);
+      return;
+    }
+    c.x = c.tx;
+    c.z = c.tz;
+    c.moving = false;
+    if (k === "gone") c.remote = false; // stays where it stood (finished = no AI)
+    c.finished = true;
+  }
+
+  remoteStep(c, dt) {
+    const k = 1 - Math.exp(-dt * 14),
+      nx = c.x + (c.tx - c.x) * k,
+      nz = c.z + (c.tz - c.z) * k,
+      sp = Math.hypot(nx - c.x, nz - c.z) / Math.max(dt, 1e-4);
+    c.x = nx;
+    c.z = nz;
+    c.moving = sp > 0.8;
+    if (c.moving) c.phase += Math.min(sp, 9) * dt * 2.2;
   }
 
   onGreen() {
@@ -253,7 +316,9 @@ export class Contestants {
     const ka = 1 - Math.exp(-dt * 12),
       kl = 1 - Math.exp(-dt * 10);
     for (const c of this.list) {
-      if (c.alive && !c.finished) {
+      if (c.remote) {
+        if (c.alive && !c.finished) this.remoteStep(c, dt);
+      } else if (c.alive && !c.finished) {
         if (mode === "green") {
           if (!c.moving) {
             c.delay -= dt;
@@ -292,10 +357,10 @@ export class Contestants {
       n = l.length;
     for (let i = 0; i < n; i++) {
       const a = l[i];
-      if (!a.alive || a.finished) continue;
+      if (!a.alive || a.finished || a.remote) continue;
       for (let j = i + 1; j < n; j++) {
         const b = l[j];
-        if (!b.alive || b.finished) continue;
+        if (!b.alive || b.finished || b.remote) continue;
         const dx = b.x - a.x,
           dz = b.z - a.z,
           d2 = dx * dx + dz * dz;
@@ -326,10 +391,13 @@ export class Contestants {
         ov = PR - d,
         nx = dx / d,
         nz = dz / d;
-      p.pos.x += nx * ov * 0.65;
-      p.pos.z += nz * ov * 0.65;
-      c.x = clamp(c.x - nx * ov * 0.35, -12.5, 12.5);
-      c.z -= nz * ov * 0.35;
+      const pk = c.remote ? 1 : 0.65; // a real player is not pushed around by my screen: I take all of it
+      p.pos.x += nx * ov * pk;
+      p.pos.z += nz * ov * pk;
+      if (!c.remote) {
+        c.x = clamp(c.x - nx * ov * 0.35, -12.5, 12.5);
+        c.z -= nz * ov * 0.35;
+      }
       const vn = p.vel.x * nx + p.vel.z * nz;
       if (vn < 0) {
         p.vel.x -= vn * nx * 0.8;
@@ -359,7 +427,7 @@ export class Contestants {
         dz = c.z - camZ,
         vis = all || dx * dx + dz * dz < dd;
       const a = c.fall + c.lean,
-        s = vis ? BASE * c.h : 0;
+        s = vis && !c.hidden ? BASE * c.h : 0;
       const bob = c.moving ? Math.abs(Math.sin(c.phase)) * 0.05 : 0;
       E.set(-a, 0, 0);
       Q.setFromEuler(E);

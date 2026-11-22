@@ -21,6 +21,8 @@ Experience the classic Red Light, Green Light challenge in a 3D environment.
 - 🏆 **Best Time:** Your best completion time is saved using browser `localStorage`.
 - 📤 **Share:** After winning or getting eliminated, tap SHARE to post a result card to Facebook (system share sheet on phones; on desktop the image is saved/copied and Facebook's share dialog opens).
 
+- 🌐 **Play Online (up to 12 players):** Press **PLAY ONLINE**, then **CREATE ROOM** (you get a 4-letter code and an invite link) or **JOIN** with a friend's code. The host presses START. Real players run on the same track and see each other live; empty seats are filled with AI contestants. See [Online Multiplayer](#-online-multiplayer).
+
 Your camera movement does not count as player movement.
 
 ---
@@ -35,6 +37,40 @@ Your camera movement does not count as player movement.
 **Desktop:** Click the game screen to capture mouse movement.
 
 **Mobile:** Use the on-screen joystick and drag the right side of the screen to control the camera.
+
+---
+
+## 🌐 Online Multiplayer
+
+Up to **12 players per room**, using **PeerJS** (WebRTC). There is no game server to host: the free public PeerJS matchmaking server only introduces the players, then they talk directly. The PeerJS library is loaded from the CDN only when someone creates or joins a room, so single player never downloads it.
+
+**How to play with friends**
+
+1. Everyone opens the game and presses **PLAY ONLINE**, then types a name.
+2. One player presses **CREATE ROOM** and shares the 4-letter code (or **COPY INVITE LINK**, which opens the game with the code already filled in).
+3. The others press **JOIN**. The lobby shows who is in the room (12 seats).
+4. The host presses **START GAME**. Everyone gets a countdown and the same round: the doll sings and turns at the same time for all players. Empty seats are AI contestants.
+5. Finishing gives you a place (#1, #2, …). After a round everybody returns to the lobby and the host can start again.
+
+**How it works**
+
+- The host is also a player and relays everything (star topology). It decides every Green / Red phase (song speed and red length), so the doll is the same for everyone. If the host is eliminated or finishes, it keeps running the rounds in the background for the others. If the host quits, the room closes.
+- Each player sends their position about 12 times a second; everybody else sees them as smoothly moving contestants. Elimination, finishing and leaving are sent as events.
+- Each player checks their own movement on Red (the usual fairness rules), so the reaction window does not depend on ping. Pausing is disabled online.
+- A round that has already started cannot be joined (the player is told to wait for the next one).
+
+**Known limits (v1)**
+
+- The AI fillers are simulated separately on each player's screen (they do not match between players).
+- No name tags, no spectating after elimination, and other players always face forward.
+- Players are trusted (a modified browser could cheat). It is meant for friends, not a public ladder.
+- A few strict home / mobile networks cannot make a direct connection without a paid relay (TURN server). If a friend cannot join, try another network or Wi-Fi. The free public PeerJS server can also be busy at times.
+- Not tested yet on real phones or over real internet latency.
+
+**Testing / hosting your own signalling server**
+
+- `?net=local` (for example `http://localhost:8000/?net=local`) uses a same-browser test transport, so you can test with two tabs without internet.
+- `?peerserver=host:port` uses your own PeerServer (`npm i peer`, `npx peerjs --port 9000`) instead of the free public one.
 
 ---
 
@@ -126,6 +162,7 @@ Squid-Game-Redlight-Greenlight/
     ├── audio.js
     ├── settings.js
     ├── share.js
+    ├── net.js
     └── ui.js
 ```
 
@@ -146,6 +183,7 @@ Squid-Game-Redlight-Greenlight/
 | `audio.js`       | Procedural sound effects and background music                  |
 | `settings.js`    | Graphics presets and saved settings                            |
 | `share.js`       | Result card image and Facebook / system sharing                |
+| `net.js`         | Online rooms (PeerJS), lobby roster, phase and event messages  |
 | `ui.js`          | Menus, HUD, and notifications                                  |
 
 ---
@@ -154,17 +192,19 @@ Squid-Game-Redlight-Greenlight/
 
 You can modify several gameplay settings directly in the JavaScript files.
 
-| Feature                          | File                | Configuration           |
-| :------------------------------- | :------------------ | :---------------------- |
-| Time Limit                       | `js/game.js`        | `LIMIT`                 |
-| Reaction Window                  | `js/game.js`        | `GRACE`                 |
-| Slide-out Forgiveness            | `js/game.js`        | `SLIDE`                 |
-| Chant Speed (Green Light length) | `js/game.js`        | `beginGreen()` (`rate`) |
-| Chant Melody & Lyrics            | `js/audio.js`       | `CHANT`                 |
-| Red Light Duration               | `js/game.js`        | `beginRed()`            |
-| Track Length                     | `js/environment.js` | `ARENA.finishZ`         |
-| AI Speed                         | `js/contestants.js` | AI movement settings    |
-| Elimination Odds                 | `js/contestants.js` | AI elimination settings |
+| Feature                          | File                | Configuration                                      |
+| :------------------------------- | :------------------ | :------------------------------------------------- |
+| Time Limit                       | `js/game.js`        | `LIMIT`                                            |
+| Reaction Window                  | `js/game.js`        | `GRACE`                                            |
+| Slide-out Forgiveness            | `js/game.js`        | `SLIDE`                                            |
+| Chant Speed (Green Light length) | `js/game.js`        | `beginGreen()` (`rate`)                            |
+| Chant Melody & Lyrics            | `js/audio.js`       | `CHANT`                                            |
+| Red Light Duration               | `js/game.js`        | `beginRed()`                                       |
+| Track Length                     | `js/environment.js` | `ARENA.finishZ`                                    |
+| Online Players per Room          | `js/net.js`         | `MAX_PLAYERS` (needs seats in `slotX` / `slotIdx`) |
+| Online Position Update Rate      | `js/net.js`         | `SEND_HZ`                                          |
+| AI Speed                         | `js/contestants.js` | AI movement settings                               |
+| Elimination Odds                 | `js/contestants.js` | AI elimination settings                            |
 
 ---
 
@@ -181,6 +221,12 @@ You can modify several gameplay settings directly in the JavaScript files.
 - Open Settings.
 - Change the graphics preset to LOW.
 
+**Cannot Create / Join an Online Room**
+
+- Check your internet. Online play needs the PeerJS library from `cdn.jsdelivr.net` and the PeerJS matchmaking server.
+- Make sure the code is the same 4 letters, and that the host has not started the round yet.
+- Try again on another network if the connection keeps failing.
+
 **No Sound**
 
 - Browsers require user interaction before playing audio.
@@ -195,6 +241,7 @@ You can modify several gameplay settings directly in the JavaScript files.
 - Vanilla JavaScript (ES Modules)
 - Three.js 0.160.0
 - Web Audio API
+- PeerJS 1.5.4 (WebRTC), loaded only for online play
 - GitHub Pages
 - Browser Local Storage
 

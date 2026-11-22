@@ -8,6 +8,7 @@ import { Game } from "./game.js";
 import { UI } from "./ui.js";
 import { Sound } from "./audio.js";
 import { shareResult } from "./share.js";
+import { Net } from "../net.js";
 import {
   settings,
   saveSettings,
@@ -140,6 +141,15 @@ function frameShot() {
 }
 
 // ---- UI wiring ----
+// Pointer lock returns a Promise in current browsers and rejects without a user gesture / in some contexts
+function lockPointer() {
+  try {
+    const r = canvas.requestPointerLock && canvas.requestPointerLock();
+    if (r && r.catch) r.catch(() => {});
+  } catch (e) {
+    /* ignore */
+  }
+}
 function goFullscreen() {
   try {
     const el = document.documentElement;
@@ -160,17 +170,54 @@ function checkPortrait() {
 function startGame(quick) {
   Sound.init();
   if (touchy()) goFullscreen();
-  else if (canvas.requestPointerLock) {
-    try {
-      canvas.requestPointerLock();
-    } catch (e) {
-      /* ignore */
-    }
-  }
+  else lockPointer();
   game.start(quick === true);
   player.releaseTouch();
   checkPortrait();
 }
+// ---- Online (see net.js) ----
+function startOnline(msg) {
+  Sound.init();
+  if (touchy()) goFullscreen();
+  else lockPointer(); // only works right after a click (the host); the others click the game once
+  game.startOnline(msg);
+  player.releaseTouch();
+}
+function backToLobby() {
+  game.toMenu();
+  Net.toLobby();
+  UI.lobby();
+  UI.show("lobby");
+}
+function leaveRoom() {
+  Net.leave();
+  game.toMenu();
+}
+let netBusy = false;
+async function netGo(fn) {
+  if (netBusy) return;
+  netBusy = true;
+  UI.netStatus("Connecting…");
+  UI.netName(); // remember the name
+  try {
+    await fn();
+    UI.netStatus("");
+    UI.lobby();
+    UI.show("lobby");
+  } catch (e) {
+    UI.netStatus((e && e.message) || "Could not connect.");
+  }
+  netBusy = false;
+}
+Net.onLobby = () => {
+  if (Net.active && !game.online) UI.lobby();
+};
+Net.onStart = startOnline;
+Net.onMsg = (m) => game.netMsg(m);
+Net.onClosed = (why) => {
+  game.toMenu();
+  UI.toast(why || "Disconnected from the room.");
+};
 function toggleMute() {
   settings.muted = !settings.muted;
   saveSettings();
@@ -179,20 +226,34 @@ function toggleMute() {
 }
 UI.init({
   play: () => startGame(false),
-  retry: () => startGame(true),
+  retry: () => (Net.active ? backToLobby() : startGame(true)),
+  netCreate: () => netGo(() => Net.host(UI.netName())),
+  netJoin: () => netGo(() => Net.join(UI.netCode(), UI.netName())),
+  lobbyStart: () => Net.start(),
+  lobbyLeave: leaveRoom,
+  lobbyCopy: () => {
+    const link =
+      location.origin +
+      location.pathname +
+      "?room=" +
+      encodeURIComponent(Net.code);
+    const done = () => UI.toast("Invite link copied: " + link);
+    try {
+      navigator.clipboard.writeText(link).then(done, () => UI.toast(link));
+    } catch (e) {
+      UI.toast(link);
+    }
+  },
   share: () => shareResult(frameShot(), game.result, (m) => UI.toast(m)),
   pause: () => game.pause(),
   resume: () => {
     game.resume();
-    if (!touchy() && canvas.requestPointerLock) {
-      try {
-        canvas.requestPointerLock();
-      } catch (e) {
-        /* ignore */
-      }
-    }
+    if (!touchy()) lockPointer();
   },
-  menu: () => game.toMenu(),
+  menu: () => {
+    Net.leave(); // no-op when offline
+    game.toMenu();
+  },
   preset: applyPreset,
   time: (name) => applyTime(name),
   volume: (v) => {
@@ -207,6 +268,14 @@ Sound.setMuted(settings.muted);
 applyPreset(settings.preset);
 applyTime(settings.tod, false);
 game.toMenu();
+// Invite link: ?room=ABCD opens the online screen with the code filled in
+{
+  const room = new URLSearchParams(location.search).get("room");
+  if (room) {
+    UI.setCode(room);
+    UI.show("online");
+  }
+}
 
 // Skip the cinematic intro with any click / tap / key
 addEventListener("pointerdown", () => game.skipIntro(), true);
@@ -259,6 +328,8 @@ function frame(now) {
     particles.update(sdt);
     rig.update(sdt);
     env.update(sdt, t, player.pos.x, player.pos.z);
+    const st = game.state;
+    Net.tick(dt, player, st === "COUNTDOWN" || st === "GREEN" || st === "RED");
   }
   renderer.render(scene, camera);
   adapt(dt);

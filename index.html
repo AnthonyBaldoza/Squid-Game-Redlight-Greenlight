@@ -111,6 +111,7 @@
       </p>
       <div class="menu-btns">
         <button class="btn" id="btnPlay">PLAY</button>
+        <button class="btn fb" id="btnOnline">PLAY ONLINE</button>
         <button class="btn alt" id="btnHow">HOW TO PLAY</button>
         <button class="btn alt" id="btnSettings">SETTINGS</button>
       </div>
@@ -180,6 +181,54 @@
         </div>
         <p class="note" id="recNote"></p>
         <button class="btn" id="setBack">DONE</button>
+      </div>
+    </div>
+
+    <!-- Online: create or join a room -->
+    <div id="online" class="screen hidden">
+      <div class="card">
+        <h2>PLAY ONLINE</h2>
+        <p class="note">
+          Up to 12 players. One person creates a room and shares the code, the
+          others join with it. Empty seats are filled by AI contestants.
+        </p>
+        <div class="row">
+          <span>Name</span>
+          <input
+            id="netName"
+            type="text"
+            maxlength="12"
+            placeholder="Player"
+            autocomplete="off"
+          />
+        </div>
+        <button class="btn" id="netCreate">CREATE ROOM</button>
+        <div class="row">
+          <input
+            id="netCode"
+            type="text"
+            maxlength="4"
+            placeholder="CODE"
+            autocomplete="off"
+            autocapitalize="characters"
+          />
+          <button class="btn small alt" id="netJoin">JOIN</button>
+        </div>
+        <p class="note" id="netStatus"></p>
+        <button class="btn alt" id="netBack">BACK</button>
+      </div>
+    </div>
+
+    <!-- Online lobby -->
+    <div id="lobby" class="screen hidden">
+      <div class="card">
+        <h2>ROOM <span id="lobbyCode" class="codebig">----</span></h2>
+        <div class="lbl" id="lobbyCount">1 / 12 PLAYERS</div>
+        <div id="lobbyList" class="roster"></div>
+        <p class="note" id="lobbyNote"></p>
+        <button class="btn" id="lobbyStart">START GAME</button>
+        <button class="btn fb small" id="lobbyCopy">COPY INVITE LINK</button>
+        <button class="btn alt" id="lobbyLeave">LEAVE ROOM</button>
       </div>
     </div>
 

@@ -178,6 +178,7 @@ export class Player {
 
   bind(canvas, t) {
     addEventListener("keydown", (e) => {
+      if (e.target && e.target.tagName === "INPUT") return; // typing a name / room code
       if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
       if (e.code === "Space" && !e.repeat) this.jumpBuf = 0.15;
       this.keys.add(e.code);
@@ -236,7 +237,8 @@ export class Player {
       if (e.pointerType === "mouse") {
         if (!document.pointerLockElement && canvas.requestPointerLock) {
           try {
-            canvas.requestPointerLock();
+            const r = canvas.requestPointerLock();
+            if (r && r.catch) r.catch(() => {});
           } catch (err) {
             /* ignore */
           }

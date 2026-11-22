@@ -1,8 +1,19 @@
 import { Sound } from "./audio.js";
 import { settings, touchy, getBest, RECOMMENDED, PRESETS } from "./settings.js";
+import { Net, MAX_PLAYERS } from "../net.js";
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["menu", "how", "settings", "pause", "over", "win"];
+const SCREENS = [
+  "menu",
+  "how",
+  "settings",
+  "pause",
+  "over",
+  "win",
+  "online",
+  "lobby",
+];
+const NAME_KEY = "rlgl.name.v1";
 const fmt = (t) => (t == null ? "--" : t.toFixed(2) + "s");
 let last = {},
   cdTimer = 0,
@@ -51,6 +62,29 @@ export const UI = {
     $("overShare").onclick = h.share;
     $("winShare").onclick = h.share;
 
+    // online
+    $("btnOnline").onclick = () => {
+      UI.netStatus("");
+      UI.show("online");
+    };
+    $("netBack").onclick = () => UI.show("menu");
+    $("netCreate").onclick = h.netCreate;
+    $("netJoin").onclick = h.netJoin;
+    $("netCode").oninput = (e) => {
+      e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, "");
+    };
+    $("netCode").onkeydown = (e) => {
+      if (e.key === "Enter") h.netJoin();
+    };
+    $("lobbyStart").onclick = h.lobbyStart;
+    $("lobbyLeave").onclick = h.lobbyLeave;
+    $("lobbyCopy").onclick = h.lobbyCopy;
+    try {
+      $("netName").value = localStorage.getItem(NAME_KEY) || "";
+    } catch (e) {
+      /* storage blocked */
+    }
+
     UI.syncHint();
     $("vol").value = Math.round(settings.volume * 100);
     $("recNote").textContent =
@@ -59,6 +93,59 @@ export const UI = {
     UI.syncTime(settings.tod);
     UI.syncAudio();
     UI.menuBest();
+  },
+
+  netName() {
+    const v = $("netName").value.trim();
+    try {
+      localStorage.setItem(NAME_KEY, v);
+    } catch (e) {
+      /* storage blocked */
+    }
+    return v;
+  },
+  netCode() {
+    return $("netCode").value.trim().toUpperCase();
+  },
+  setCode(c) {
+    $("netCode").value = String(c || "")
+      .toUpperCase()
+      .replace(/[^A-Z]/g, "")
+      .slice(0, 4);
+  },
+  netStatus(msg) {
+    $("netStatus").textContent = msg || "";
+  },
+  // Lobby roster (12 seats) + who can start
+  lobby() {
+    const host = Net.role === "host";
+    $("lobbyCode").textContent = Net.code || "----";
+    $("lobbyCount").textContent =
+      Net.players.length + " / " + MAX_PLAYERS + " PLAYERS";
+    const list = $("lobbyList");
+    list.innerHTML = "";
+    const players = Net.players.slice().sort((a, b) => a.slot - b.slot);
+    for (let i = 0; i < MAX_PLAYERS; i++) {
+      const p = players[i],
+        d = document.createElement("div");
+      if (p) {
+        d.textContent = p.name;
+        if (p.slot === Net.slot) d.classList.add("me");
+        if (p.slot === 0) {
+          const s = document.createElement("small");
+          s.textContent = "  HOST";
+          d.appendChild(s);
+        }
+      } else {
+        d.textContent = "· · ·";
+        d.classList.add("empty");
+      }
+      list.appendChild(d);
+    }
+    $("lobbyStart").classList.toggle("hidden", !host);
+    $("lobbyNote").textContent = host
+      ? "Share the code or the invite link. Empty seats are filled by AI. Press START when everyone is in."
+      : "Waiting for the host to start the game…";
   },
 
   intro(on) {
@@ -226,13 +313,19 @@ export const UI = {
 
   showOver(reason) {
     $("overReason").textContent = reason;
+    $("overRestart").textContent = Net.active ? "BACK TO LOBBY" : "TRY AGAIN";
     UI.hud(false);
     UI.show("over");
   },
-  showVictory(time, best, isNew) {
+  showVictory(time, best, isNew, rank) {
     $("winTime").textContent = fmt(time);
     $("winBest").textContent = fmt(best);
-    $("winNew").classList.toggle("hidden", !isNew);
+    $("winNew").textContent =
+      (rank ? "PLACE #" + rank : "") +
+      (rank && isNew ? "  ·  " : "") +
+      (isNew ? "New personal best!" : "");
+    $("winNew").classList.toggle("hidden", !rank && !isNew);
+    $("winRestart").textContent = Net.active ? "BACK TO LOBBY" : "PLAY AGAIN";
     UI.hud(false);
     UI.show("win");
   },
