@@ -46,8 +46,43 @@ function loadPeerJS() {
     document.head.appendChild(s);
   });
 }
+
+// TURN relay (Metered) so players on strict networks can still connect.
+// If the free quota ever runs out or the credential is abused, create a new
+// credential in the Metered dashboard and replace these two values.
+const TURN_USER = "3fb7b264813ce50364294c8b";
+const TURN_PASS = "LfjIU4c1hQlZypTT";
+
 function peerOptions() {
-  const o = { debug: 0 };
+  const o = {
+    debug: 0,
+    config: {
+      iceServers: [
+        { urls: "stun:stun.relay.metered.ca:80" },
+        { urls: "stun:stun.l.google.com:19302" },
+        {
+          urls: "turn:global.relay.metered.ca:80",
+          username: TURN_USER,
+          credential: TURN_PASS,
+        },
+        {
+          urls: "turn:global.relay.metered.ca:80?transport=tcp",
+          username: TURN_USER,
+          credential: TURN_PASS,
+        },
+        {
+          urls: "turn:global.relay.metered.ca:443",
+          username: TURN_USER,
+          credential: TURN_PASS,
+        },
+        {
+          urls: "turns:global.relay.metered.ca:443?transport=tcp",
+          username: TURN_USER,
+          credential: TURN_PASS,
+        },
+      ],
+    },
+  };
   const ps = new URLSearchParams(location.search).get("peerserver");
   if (ps) {
     const [h, p] = ps.split(":");
