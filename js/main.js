@@ -9,6 +9,7 @@ import { UI } from "./ui.js";
 import { Sound } from "./audio.js";
 import { shareResult } from "./share.js";
 import { mountLeaderboardButton } from "./leaderboard.js";
+import { mountDalgonaButton } from "./dalgona.js";
 import { Net } from "../net.js";
 import {
   settings,
@@ -355,3 +356,4 @@ document.addEventListener("visibilitychange", () => {
 last = performance.now();
 raf = requestAnimationFrame(frame);
 mountLeaderboardButton();
+mountDalgonaButton();
