@@ -3,6 +3,7 @@
 //   import { startDalgona, mountDalgonaButton } from "./dalgona.js";
 //   mountDalgonaButton();                       // floating button (hidden while a run is playing)
 //   startDalgona({ onDone: (r) => {...} });     // r = { won, time, shape }   (optional)
+//   startRoundTwo();                            // "ROUND 1 CLEARED" card, counts down, then starts Dalgona
 //
 // How it plays: hold the mouse / finger and trace the grooved line. Staying on the line carves it.
 // Drifting away from it while pressed builds up cracks; a full crack meter or the timer ending = eliminated.
@@ -67,10 +68,7 @@ const SHAPES = [
       let body = arc(0, y0, R, Math.PI, TAU, 48); // the dome
       for (let k = 0; k < 3; k++)
         body = body.concat(arc(R - sr * (2 * k + 1), y0, sr, 0, Math.PI, 20)); // scalloped edge
-      const handle = [
-        [0, y0 + sr],
-        [0, 0.58],
-      ].concat(
+      const handle = [[0, y0 + sr], [0, 0.58]].concat(
         arc(-0.11, 0.58, 0.11, 0, Math.PI, 16), // the hook
       );
       return [body, handle];
@@ -173,6 +171,7 @@ function ensureStyle() {
 // ------------------------------------------------------------------ the game
 export function startDalgona(opts = {}) {
   ensureStyle();
+  if (document.exitPointerLock) document.exitPointerLock();
   const ov = document.createElement("div");
   ov.className = "dg-ov";
   ov.innerHTML =
@@ -229,10 +228,8 @@ export function startDalgona(opts = {}) {
     endEl.hidden = true;
   }
 
-  const progress = () =>
-    samples.reduce((n, s) => n + (s.done ? 1 : 0), 0) / samples.length;
-  const bestOf = (id) =>
-    parseFloat(localStorage.getItem(BEST_KEY + id)) || null;
+  const progress = () => samples.reduce((n, s) => n + (s.done ? 1 : 0), 0) / samples.length;
+  const bestOf = (id) => parseFloat(localStorage.getItem(BEST_KEY + id)) || null;
 
   // ---- input
   function point(e) {
@@ -294,10 +291,7 @@ export function startDalgona(opts = {}) {
         best = bestOf(shape.id),
         isNew = best === null || t < best;
       if (isNew) localStorage.setItem(BEST_KEY + shape.id, t.toFixed(2));
-      sub =
-        t.toFixed(2) +
-        "s" +
-        (isNew ? " (new best!)" : " (best " + best.toFixed(2) + "s)");
+      sub = t.toFixed(2) + "s" + (isNew ? " (new best!)" : " (best " + best.toFixed(2) + "s)");
       tone(660, 0.14, "triangle", 0.07);
       tone(880, 0.14, "triangle", 0.07, 0.14);
       tone(1175, 0.3, "triangle", 0.07, 0.28);
@@ -308,23 +302,12 @@ export function startDalgona(opts = {}) {
     }
     const title = won ? "CLEAR!" : kind === "broken" ? "CRACKED" : "TIME'S UP";
     endEl.innerHTML =
-      '<div class="dg-card"><h2>' +
-      title +
-      "</h2><p>" +
-      shape.name +
-      " · " +
-      sub +
-      "</p>" +
+      '<div class="dg-card"><h2>' + title + "</h2><p>" + shape.name + " · " + sub + "</p>" +
       '<button class="dg-btn" data-a="retry">RETRY</button>' +
       '<button class="dg-btn alt" data-a="next">NEXT SHAPE</button>' +
       '<button class="dg-btn alt" data-a="exit">EXIT</button></div>';
     endEl.hidden = false;
-    if (opts.onDone)
-      opts.onDone({
-        won,
-        time: won ? shape.time - timeLeft : null,
-        shape: shape.id,
-      });
+    if (opts.onDone) opts.onDone({ won, time: won ? shape.time - timeLeft : null, shape: shape.id });
   }
   endEl.addEventListener("click", (e) => {
     const a = e.target && e.target.dataset && e.target.dataset.a;
@@ -368,14 +351,7 @@ export function startDalgona(opts = {}) {
   const P = (x, y) => [cx + x * R, cy + y * R];
   function draw() {
     ctx.clearRect(0, 0, W, H);
-    const bg = ctx.createRadialGradient(
-      cx,
-      cy,
-      R * 0.2,
-      cx,
-      cy,
-      Math.max(W, H) * 0.7,
-    );
+    const bg = ctx.createRadialGradient(cx, cy, R * 0.2, cx, cy, Math.max(W, H) * 0.7);
     bg.addColorStop(0, "#3a1f0a");
     bg.addColorStop(1, "#120a05");
     ctx.fillStyle = bg;
@@ -386,14 +362,7 @@ export function startDalgona(opts = {}) {
     ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
     // cookie
-    const cg = ctx.createRadialGradient(
-      cx - R * 0.25,
-      cy - R * 0.3,
-      R * 0.1,
-      cx,
-      cy,
-      R,
-    );
+    const cg = ctx.createRadialGradient(cx - R * 0.25, cy - R * 0.3, R * 0.1, cx, cy, R);
     cg.addColorStop(0, "#f2c86e");
     cg.addColorStop(1, "#c68628");
     ctx.beginPath();
@@ -483,11 +452,7 @@ export function startDalgona(opts = {}) {
     if (!carvedAny && state === "play") {
       ctx.font = "16px sans-serif";
       ctx.fillStyle = "rgba(255,255,255,.85)";
-      ctx.fillText(
-        "Hold and trace the line. Wander off and the cookie cracks.",
-        W / 2,
-        H - 28,
-      );
+      ctx.fillText("Hold and trace the line. Wander off and the cookie cracks.", W / 2, H - 28);
     }
   }
 
@@ -503,6 +468,46 @@ export function startDalgona(opts = {}) {
   reset(idx);
   raf = requestAnimationFrame(loop);
   return { exit };
+}
+
+// "ROUND 1 CLEARED" card that counts down and then starts Dalgona. Call it after the player wins Red Light, Green Light.
+export function startRoundTwo(opts = {}) {
+  ensureStyle();
+  if (document.exitPointerLock) document.exitPointerLock();
+  const ov = document.createElement("div");
+  ov.className = "dg-ov";
+  ov.style.background = "rgba(8,5,2,.88)";
+  ov.innerHTML =
+    '<div class="dg-end"><div class="dg-card"><h2>ROUND 1 CLEARED</h2>' +
+    "<p>NEXT: ROUND 2 · DALGONA</p>" +
+    '<p class="dg-n">Starting in 5…</p>' +
+    '<button class="dg-btn" data-a="go">START NOW</button>' +
+    '<button class="dg-btn alt" data-a="skip">SKIP</button></div></div>';
+  document.body.appendChild(ov);
+  const note = ov.querySelector(".dg-n");
+  let n = 5,
+    timer = 0;
+  const close = () => {
+    clearInterval(timer);
+    ov.remove();
+  };
+  const go = () => {
+    close();
+    startDalgona(opts);
+  };
+  timer = setInterval(() => {
+    n--;
+    if (n <= 0) go();
+    else note.textContent = "Starting in " + n + "…";
+  }, 1000);
+  ov.addEventListener("click", (e) => {
+    const a = e.target && e.target.dataset && e.target.dataset.a;
+    if (a === "go") go();
+    else if (a === "skip") {
+      close();
+      if (opts.onExit) opts.onExit();
+    }
+  });
 }
 
 // Optional floating button (below the leaderboard button); hidden while the main game is being played

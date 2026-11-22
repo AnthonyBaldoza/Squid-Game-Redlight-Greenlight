@@ -2,6 +2,7 @@ import { Sound } from "./audio.js";
 import { UI } from "./ui.js";
 import { ARENA } from "./environment.js";
 import { getBest, setBest } from "./settings.js";
+import { startRoundTwo } from "./dalgona.js";
 import { Net, slotX, slotIdx } from "../net.js";
 import { submitScore } from "./leaderboard.js";
 
@@ -528,6 +529,17 @@ export class Game {
           const w = this.winInfo;
           UI.showVictory(w.time, w.best, w.isNew, this.online ? Net.rank : 0);
           submitScore(w.time);
+
+          if (this.endT > 2.4 && !this.winShown) {
+  this.winShown = true;
+  const w = this.winInfo;
+  UI.showVictory(w.time, w.best, w.isNew, this.online ? Net.rank : 0);
+  submitScore(w.time);
+  if (!this.online)
+    setTimeout(() => {
+      if (this.state === S.VICTORY) startRoundTwo();
+    }, 2500);
+}
         }
         break;
       default:
